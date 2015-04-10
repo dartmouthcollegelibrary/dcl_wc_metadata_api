@@ -18,6 +18,7 @@ module WC_METADATA_API
 	   uri = URI.parse(opts[:url])
            request = Net::HTTP::Get.new(uri.request_uri)
 	   request['Authorization'] =token.hmac_signature('GET', opts[:url], :principal_id => @principalID, :principal_idns => @principalDNS)
+ 	   request['Accept'] = 'application/atom+xml;content="application/vnd.oclc.marc21+xml"'
 	   request['Content-Type'] = 'application/atom+xml'
 	   http = Net::HTTP.new(uri.host, uri.port)
 	   http.use_ssl = true
