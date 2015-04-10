@@ -4,7 +4,7 @@ require 'nokogiri'
 require 'uri'
 require 'net/http'
 require 'cgi'
-require 'oclc/auth'
+require_relative 'oclc/auth'
 
 
 
