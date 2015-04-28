@@ -1,10 +1,11 @@
 Gem::Specification.new do |s|
    s.name = 'dcl_wc_metadata_api'
    s.version = '0.0.1'
-   s.author = ['Shaun Akhtar', 'Terry Reese', 'Steve Meyer']
+   s.author = ['Shaun Akhtar']
    s.email = ['shaun.y.akhtar@dartmouth.edu']
    s.summary = 'DCL-local WorldCat Metadata API tools'
-   s.files = Dir.glob("{lib}/**/*")
+   s.files = Dir.glob("{lib,config}/**/*")
+   s.executables = ['dcl-wc-metadata-api']
    s.require_path = 'lib'
    s.add_dependency 'json', '~> 1.8', '>= 1.8.1'
    s.add_dependency 'rest-client', '~> 1.6', '>= 1.6.7'
