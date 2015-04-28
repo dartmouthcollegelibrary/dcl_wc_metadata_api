@@ -1,10 +1,10 @@
 require_relative 'dcl_wc_metadata_api/client'
 require_relative 'dcl_wc_metadata_api/helper'
+require_relative 'oclc/auth'
 require 'nokogiri'
 require 'uri'
 require 'net/http'
 require 'cgi'
-require_relative 'oclc/auth'
-
-
+require 'yaml'
+require 'trollop'
 

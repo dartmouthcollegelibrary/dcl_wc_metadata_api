@@ -1,8 +1,6 @@
 #!/usr/bin/env ruby
 
 require_relative '../lib/dcl_wc_metadata_api'
-require 'yaml'
-require 'trollop'
 
 # Define command-line options and documentation
 SUB_COMMANDS = %w(read create)
