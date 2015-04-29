@@ -49,7 +49,7 @@ def log_output(response, cmd)
   f.write(response)
   f.close
     
-  puts "OCLC WorldCat Metadata API: " + cmd + " bibliographic resource"
+  puts "OCLC WorldCat Metadata API: " + cmd.capitalize + " bibliographic resource"
   puts "API response written to " + filename
 end
 
@@ -64,19 +64,20 @@ cmd_opts = case cmd
   when "read"
     Trollop::die "OCLC record number(s) required" if ARGV.empty?
     input = ARGV.shift
-    response = ""
-    
+    response = Nokogiri::XML::Document.parse("<entries/>")
+
     case input
  
     # Single record number
     when /^[\d]+$/
-      response << client.WorldCatGetBibRecord(
+      r = Nokogiri::XML(client.WorldCatGetBibRecord(
         :oclcNumber => input,
         :holdingLibraryCode => c["holdingLibraryCode"],
         :schema => c["schema"],
         :instSymbol => c["instSymbol"]
-      )
-    
+      ))
+      response.root << r.at_css("entry")
+  
     # List in file
     else
       numbers = []    
@@ -84,21 +85,21 @@ cmd_opts = case cmd
         line.scan(/[\d]+/) { |match| numbers << match } # Extract digit strings
       }
       numbers.each { |number|        
-        r = client.WorldCatGetBibRecord(
+        r = Nokogiri::XML(client.WorldCatGetBibRecord(
           :oclcNumber => number,
           :holdingLibraryCode => c["holdingLibraryCode"],
           :schema => c["schema"],
           :instSymbol => c["instSymbol"]
-        )
-        response << r
+        ))
+        response.root << r.at_css("entry")
       }
       
       #TODO: Exception handling
       #TODO: Multiple record numbers on command line?
     end
-    
+
     if global_opts[:verbose]
-      puts response
+      puts response.to_xml
     end
     
     log_output(response, cmd) #TODO: Exception handling based on status code
