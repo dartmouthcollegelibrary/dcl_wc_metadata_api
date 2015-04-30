@@ -28,7 +28,9 @@ end
 input = ""
 
 # Set up API client
-credentials = YAML.load(File.open(File.dirname(__FILE__) + "/../config/credentials.yml", "r"))
+credentials = YAML.load(
+  File.open(File.dirname(__FILE__) + "/../config/credentials.yml", "r")
+)
 c = credentials["credentials"]
 
 client = WC_METADATA_API::Client.new(
@@ -64,7 +66,9 @@ cmd_opts = case cmd
   when "read"
     Trollop::die "OCLC record number(s) required" if ARGV.empty?
     input = ARGV.shift
-    response = Nokogiri::XML::Document.parse("<entries/>")
+    response = Nokogiri::XML::Document.parse(
+      "<collection xmlns=\"http://www.loc.gov/MARC21/slim\">"
+    )
 
     case input
  
@@ -76,7 +80,9 @@ cmd_opts = case cmd
         :schema => c["schema"],
         :instSymbol => c["instSymbol"]
       ))
-      response.root << r.at_css("entry")
+      response.root << r.at_xpath("//marc:record",
+          "marc" => "http://www.loc.gov/MARC21/slim"
+      )
   
     # List in file
     else
@@ -91,7 +97,9 @@ cmd_opts = case cmd
           :schema => c["schema"],
           :instSymbol => c["instSymbol"]
         ))
-        response.root << r.at_css("entry")
+        response.root << r.at_xpath("//marc:record",
+          "marc" => "http://www.loc.gov/MARC21/slim"
+        )
       }
       
       #TODO: Exception handling
