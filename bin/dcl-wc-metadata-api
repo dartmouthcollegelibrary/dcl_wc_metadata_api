@@ -2,6 +2,8 @@
 
 require_relative '../lib/dcl_wc_metadata_api'
 
+#TODO: Refactor single/multiple operations as functions or child classes
+
 # Define command-line options and documentation
 SUB_COMMANDS = %w(read create)
 global_opts = Trollop::options do
@@ -16,8 +18,8 @@ Commands include:
   create  Upload new record(s) to OCLC
 
 For read, <input> is a numeric record number or the path of a file containing a\
- list of numeric record numbers. For create, <input> is the path of a file\
- containing one or more MARCXML records.
+ list of numeric record numbers. For create, <input> is the path of a valid\
+ MARCXML file containing one or more records.
 
 Options include:
 EOS
@@ -73,7 +75,7 @@ cmd_opts = case cmd
     case input
  
     # Single record number
-    when /^[\d]+$/
+    when /^[\d]+$/ #TODO: Extract digit string
       r = Nokogiri::XML(client.WorldCatGetBibRecord(
         :oclcNumber => input,
         :holdingLibraryCode => c["holdingLibraryCode"],
@@ -84,7 +86,7 @@ cmd_opts = case cmd
           "marc" => "http://www.loc.gov/MARC21/slim"
       )
   
-    # List in file
+    # List of record numbers in file
     else
       numbers = []    
       File.open(input, "r").each { |line| 
@@ -115,8 +117,66 @@ cmd_opts = case cmd
   # Create API operation
   when "create"
     Trollop::die "Filename of MARCXML record(s) required" if ARGV.empty?
-    #TODO
-
+    input = Nokogiri::XML(File.read(ARGV.shift))
+    response = Nokogiri::XML::Document.parse(
+      "<collection xmlns=\"http://www.loc.gov/MARC21/slim\">"
+    )
+    count = input.xpath("count(//marc:record)",
+      "marc" => "http://www.loc.gov/MARC21/slim"
+    )
+     
+    case count
+    
+    # Single record
+    when 1
+      r = client.WorldCatAddBibRecord(
+        :holdingLibraryCode => c["holdingLibraryCode"],
+        :schema => c["schema"],
+        :instSymbol => c["instSymbol"],
+        :xRecord => input.to_s
+      )
+      rc = Nokogiri::XML::Document.parse(client.LastResponseCode.body)
+      if client.LastResponseCode.code == '201'
+        response.root << rc.at_xpath("//marc:record",
+            "marc" => "http://www.loc.gov/MARC21/slim"
+        )
+      else
+        puts rc
+      end
+    
+    # Multiple records
+    else   
+      records = []
+      input.xpath("marc:collection/marc:record", 
+        "marc" => "http://www.loc.gov/MARC21/slim"
+      ).each { |record| records << record.to_s }
+      records.each { |record|
+        marcxml = Nokogiri::XML::Document.parse(record)
+        marcxml.root['xmlns:marc'] = 'http://www.loc.gov/MARC21/slim'
+        r = client.WorldCatAddBibRecord(
+          :holdingLibraryCode => c["holdingLibraryCode"],
+          :schema => c["schema"],
+          :instSymbol => c["instSymbol"],
+          :xRecord => marcxml.to_s
+        )
+        rc = Nokogiri::XML::Document.parse(client.LastResponseCode.body)
+        if client.LastResponseCode.code == '201'
+          response.root << rc.at_xpath("//marc:record",
+              "marc" => "http://www.loc.gov/MARC21/slim"
+          )
+        else
+          puts rc
+        end       
+      }
+    
+    end
+    
+    if global_opts[:verbose]
+      puts response.to_xml
+    end
+    
+    log_output(response, cmd) #TODO: Exception handling based on status code
+    
   # Any other command
   else
     Trollop::die "Unknown subcommand #{cmd.inspect}. Select one of: " + \
