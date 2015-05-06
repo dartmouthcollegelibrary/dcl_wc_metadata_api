@@ -25,7 +25,7 @@ module WC_METADATA_API
 	   response = http.start do |http|
 	      http.request(request)
 	   end
-	   return response.body
+	   return response
      end
 
      def MakeHTTP_POST_PUT_Request(opts={})

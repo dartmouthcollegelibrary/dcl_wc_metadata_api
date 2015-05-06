@@ -44,21 +44,31 @@ client = WC_METADATA_API::Client.new(
 )
 
 # Write to output file
-def log_output(response, cmd)
-  time = Time.now
-  t = time.strftime("%Y%m%d%H%M%S")
-  filename = "wc-" + cmd + "-" + t + ".xml"
-  f = File.new(filename, "w+:UTF-8")
+def log_output(response, cmd, successes, failures)
+  status = (successes > 0 ? true : false) # Check for any successes
+  
+  if status
+    time = Time.now
+    t = time.strftime("%Y%m%d%H%M%S")
+    filename = "wc-" + cmd + "-" + t + ".xml"
+    f = File.new(filename, "w+:UTF-8")
 
-  f.write(response)
-  f.close
+    f.write(response)
+    f.close
+  end
+  
+  verbs = { "read" => "Read", "create" => "Created" }
     
-  puts "OCLC WorldCat Metadata API: " + cmd.capitalize + " bibliographic resource"
-  puts "API response written to " + filename
+  puts "OCLC WorldCat Metadata API: " + cmd.capitalize + " operation"
+  puts verbs[cmd] + " " + successes.to_s + \
+    (successes > 1 ? " records, " : " record, ") + failures.to_s + " failed"
+  puts "Records written to " + filename if status
 end
 
 # Parse command-line input
 cmd = ARGV.shift
+successes = 0
+failures = 0
 cmd_opts = case cmd
 
   when nil
@@ -76,15 +86,22 @@ cmd_opts = case cmd
  
     # Single record number
     when /^[\d]+$/ #TODO: Extract digit string
-      r = Nokogiri::XML(client.WorldCatGetBibRecord(
+      r = client.WorldCatGetBibRecord(
         :oclcNumber => input,
         :holdingLibraryCode => c["holdingLibraryCode"],
         :schema => c["schema"],
         :instSymbol => c["instSymbol"]
-      ))
-      response.root << r.at_xpath("//marc:record",
-          "marc" => "http://www.loc.gov/MARC21/slim"
       )
+      rc = Nokogiri::XML::Document.parse(client.LastResponseCode.body)
+      if client.LastResponseCode.code == '200'
+        response.root << rc.at_xpath("//marc:record",
+            "marc" => "http://www.loc.gov/MARC21/slim"
+        )
+        successes += 1
+      else
+        puts rc
+        failures += 1
+      end
   
     # List of record numbers in file
     else
@@ -92,19 +109,26 @@ cmd_opts = case cmd
       File.open(input, "r").each { |line| 
         line.scan(/[\d]+/) { |match| numbers << match } # Extract digit strings
       }
+      
       numbers.each { |number|        
-        r = Nokogiri::XML(client.WorldCatGetBibRecord(
+        r = client.WorldCatGetBibRecord(
           :oclcNumber => number,
           :holdingLibraryCode => c["holdingLibraryCode"],
           :schema => c["schema"],
           :instSymbol => c["instSymbol"]
-        ))
-        response.root << r.at_xpath("//marc:record",
-          "marc" => "http://www.loc.gov/MARC21/slim"
         )
+        rc = Nokogiri::XML::Document.parse(client.LastResponseCode.body)
+        if client.LastResponseCode.code == '200'
+          response.root << rc.at_xpath("//marc:record",
+              "marc" => "http://www.loc.gov/MARC21/slim"
+          )
+          successes += 1
+        else
+          puts rc
+          failures += 1
+        end
       }
       
-      #TODO: Exception handling
       #TODO: Multiple record numbers on command line?
     end
 
@@ -112,7 +136,7 @@ cmd_opts = case cmd
       puts response.to_xml
     end
     
-    log_output(response, cmd) #TODO: Exception handling based on status code
+    log_output(response, cmd, successes, failures)
 
   # Create API operation
   when "create"
@@ -140,8 +164,10 @@ cmd_opts = case cmd
         response.root << rc.at_xpath("//marc:record",
             "marc" => "http://www.loc.gov/MARC21/slim"
         )
+        successes += 1
       else
         puts rc
+        failures += 1
       end
     
     # Multiple records
@@ -150,9 +176,10 @@ cmd_opts = case cmd
       input.xpath("marc:collection/marc:record", 
         "marc" => "http://www.loc.gov/MARC21/slim"
       ).each { |record| records << record.to_s }
+      
       records.each { |record|
         marcxml = Nokogiri::XML::Document.parse(record)
-        marcxml.root['xmlns:marc'] = 'http://www.loc.gov/MARC21/slim'
+        marcxml.root['xmlns:marc'] = 'http://www.loc.gov/MARC21/slim'             
         r = client.WorldCatAddBibRecord(
           :holdingLibraryCode => c["holdingLibraryCode"],
           :schema => c["schema"],
@@ -164,9 +191,11 @@ cmd_opts = case cmd
           response.root << rc.at_xpath("//marc:record",
               "marc" => "http://www.loc.gov/MARC21/slim"
           )
+          successes += 1
         else
           puts rc
-        end       
+          failures += 1
+        end              
       }
     
     end
@@ -175,7 +204,7 @@ cmd_opts = case cmd
       puts response.to_xml
     end
     
-    log_output(response, cmd) #TODO: Exception handling based on status code
+    log_output(response, cmd, successes, failures)
     
   # Any other command
   else
