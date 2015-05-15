@@ -6,7 +6,7 @@ require_relative '../lib/dcl_wc_metadata_api'
 
 # Define command-line options and documentation
 SUB_COMMANDS = %w(read create)
-global_opts = Trollop::options do
+global_opts = Clop::options do
   banner <<-EOS
 dcl-wc-metadata-api, DCL-local WorldCat Metadata API tools.
 
@@ -78,11 +78,11 @@ failures = 0
 cmd_opts = case cmd
 
   when nil
-    Trollop::die "No command given. Select one of: " + SUB_COMMANDS.join(", ")
+    Clop::die "No command given. Select one of: " + SUB_COMMANDS.join(", ")
     
   # Read API operation
   when "read"
-    Trollop::die "OCLC record number(s) required" if ARGV.empty?
+    Clop::die "OCLC record number(s) required" if ARGV.empty?
     input = ARGV.shift
     response_status = ""
     response_data = Nokogiri::XML::Document.parse(
@@ -151,7 +151,7 @@ cmd_opts = case cmd
 
   # Create API operation
   when "create"
-    Trollop::die "Filename of MARCXML record(s) required" if ARGV.empty?
+    Clop::die "Filename of MARCXML record(s) required" if ARGV.empty?
     input = Nokogiri::XML(File.read(ARGV.shift))
     response_status = ""
     response_data = Nokogiri::XML::Document.parse(
@@ -240,7 +240,7 @@ cmd_opts = case cmd
     
   # Any other command
   else
-    Trollop::die "Unknown subcommand #{cmd.inspect}. Select one of: " + \
+    Clop::die "Unknown subcommand #{cmd.inspect}. Select one of: " + \
     SUB_COMMANDS.join(", ")
     
   end
