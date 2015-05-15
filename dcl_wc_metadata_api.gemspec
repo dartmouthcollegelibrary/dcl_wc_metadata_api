@@ -12,6 +12,6 @@ Gem::Specification.new do |s|
    s.has_rdoc = false
    s.date = '2015-04-10'
    s.license = 'Apache 2'
-   s.description = "Dartmouth College Library scripts using Terry Reese's wc_metadata_api and Steve Meyer's oclc-auth gems."
+   s.description = "Dartmouth College Library scripts using Terry Reese's wc_metadata_api and OCLC's oclc-auth-ruby gems."
 end
 

@@ -1,5 +1,5 @@
-require_relative 'dcl_wc_metadata_api/client'
-require_relative 'dcl_wc_metadata_api/helper'
+require_relative 'wc_metadata_api/client'
+require_relative 'wc_metadata_api/helper'
 require_relative 'oclc/auth'
 require_relative 'clop/clop'
 require 'nokogiri'
