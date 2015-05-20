@@ -32,9 +32,10 @@ Commands include:
   read    Download record(s) from OCLC
   create  Upload new record(s) to OCLC
 
-For read, <input> is a numeric record number or the path of a file containing a\
- list of numeric record numbers. For create, <input> is the path of a valid\
- MARCXML file containing one or more records.
+For read, <input> is one or more record numbers (separated only by a comma) or\
+ the path of a file containing a list of record numbers, one per line. For\
+ create, <input> is the path of a valid MARCXML file containing one or more\
+ records.
 
 Options include:
 EOS
@@ -103,13 +104,20 @@ cmd_opts = case cmd
     response_data = Nokogiri::XML::Document.parse(
       "<collection xmlns=\"http://www.loc.gov/MARC21/slim\">"
     )
+    numbers = []
 
-    case input
- 
-    # Single record number
-    when /^[\d]+$/ #TODO: Extract digit string
+    # Extract digit strings from file or command-line input
+    if File.exists?(input)
+      File.open(input, "r").each { |line| 
+        line.scan(/[\d]+/) { |match| numbers << match }
+      }
+    else
+      input.scan(/[\d]+/) { |match| numbers << match }
+    end
+    
+    numbers.each do |number|        
       r = client.WorldCatGetBibRecord(
-        :oclcNumber => input,
+        :oclcNumber => number,
         :holdingLibraryCode => c["holdingLibraryCode"],
         :schema => c["schema"],
         :instSymbol => c["instSymbol"]
@@ -119,47 +127,15 @@ cmd_opts = case cmd
         response_data.root << rc.at_xpath("//marc:record",
             "marc" => "http://www.loc.gov/MARC21/slim"
         )
-        response_status << input + ": read\n"
-        puts input + ": found" if global_opts[:verbose]
+        response_status << number + ": read\n"
+        puts number + ": found" if global_opts[:verbose]
         successes += 1
       else
-        response_status << input + ": failed\n"
+        response_status << number + ": failed\n"
         response_status << rc.to_s
-        puts input + ": failed" if global_opts[:verbose]
+        puts number + ": failed" if global_opts[:verbose]
         failures += 1
       end
-  
-    # List of record numbers in file
-    else
-      numbers = []    
-      File.open(input, "r").each { |line| 
-        line.scan(/[\d]+/) { |match| numbers << match } # Extract digit strings
-      }
-      
-      numbers.each do |number|        
-        r = client.WorldCatGetBibRecord(
-          :oclcNumber => number,
-          :holdingLibraryCode => c["holdingLibraryCode"],
-          :schema => c["schema"],
-          :instSymbol => c["instSymbol"]
-        )
-        rc = Nokogiri::XML::Document.parse(client.LastResponseCode.body)
-        if client.LastResponseCode.code == "200"
-          response_data.root << rc.at_xpath("//marc:record",
-              "marc" => "http://www.loc.gov/MARC21/slim"
-          )
-          response_status << number + ": read\n"
-          puts number + ": found" if global_opts[:verbose]
-          successes += 1
-        else
-          response_status << number + ": failed\n"
-          response_status << rc.to_s
-          puts number + ": failed" if global_opts[:verbose]
-          failures += 1
-        end
-      end
-      
-      #TODO: Multiple record numbers on command line?
     end
  
     log_output(response_data, response_status, cmd, successes, failures)
