@@ -17,6 +17,7 @@
 require_relative '../lib/dcl_wc_metadata_api'
 
 #TODO: Refactor single/multiple operations as functions or child classes
+#TODO: Enhance subcommand parsing to allow options after subcommand
 
 # Define command-line options and documentation
 SUB_COMMANDS = %w(read create)
@@ -80,7 +81,7 @@ def log_output(response_data, response_status, cmd, successes, failures)
     
   puts "OCLC WorldCat Metadata API: " + cmd.capitalize + " operation"
   puts verbs[cmd] + " " + successes.to_s + \
-    (successes > 1 ? " records, " : " record, ") + failures.to_s + " failed"
+    (successes != 1 ? " records, " : " record, ") + failures.to_s + " failed"
   puts "Records written to " + d_filename if any_records
   puts "Log written to " + s_filename
 end
@@ -179,38 +180,9 @@ cmd_opts = case cmd
     
     # No well-formed records
     when 0
-      puts "Create operation: No MARCXML records found as input"
+      puts "Create operation: No well-formed MARCXML records found as input"
     
-    # Single record
-    when 1
-      r = client.WorldCatAddBibRecord(
-        :holdingLibraryCode => c["holdingLibraryCode"],
-        :schema => c["schema"],
-        :instSymbol => c["instSymbol"],
-        :xRecord => input.to_s
-      )
-      rc = Nokogiri::XML::Document.parse(client.LastResponseCode.body)
-      if client.LastResponseCode.code == "201"
-        response_data.root << rc.at_xpath("//marc:record",
-            "marc" => "http://www.loc.gov/MARC21/slim"
-        )
-        id = input.at_xpath(
-          "//marc:record/marc:datafield[@tag='035']/marc:subfield[@code='a']",
-          "marc" => "http://www.loc.gov/MARC21/slim").text
-        response_status << id + ": created\n"
-        puts id + ": created" if global_opts[:verbose]
-        successes += 1
-      else
-        id = input.at_xpath(
-          "//marc:record/marc:datafield[@tag='035']/marc:subfield[@code='a']",
-          "marc" => "http://www.loc.gov/MARC21/slim").text
-        response_status << id + ": failed\n"
-        response_status << rc.to_s
-        puts id + ": failed" if global_opts[:verbose]
-        failures += 1
-      end
-    
-    # Multiple records
+    # One or more records
     else
       records = {}
       input.xpath("//marc:record", 
@@ -223,7 +195,9 @@ cmd_opts = case cmd
         end
 
       records.each_pair do |id, record|
-        record["xmlns:marc"] = "http://www.loc.gov/MARC21/slim"    
+        if record.namespace_definitions.length == 0
+          record["xmlns:marc"] = "http://www.loc.gov/MARC21/slim"
+        end
         r = client.WorldCatAddBibRecord(
           :holdingLibraryCode => c["holdingLibraryCode"],
           :schema => c["schema"],
