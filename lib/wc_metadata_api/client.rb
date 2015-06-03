@@ -23,6 +23,7 @@ module WC_METADATA_API
 
 
      attr_accessor :LastResponseCode
+     attr_accessor :debug_info # Modified to store debug string
      def initialize(options={})
         @debug = options[:debug]
         @wskey = options[:wskey]

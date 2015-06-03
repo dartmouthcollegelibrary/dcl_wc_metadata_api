@@ -40,6 +40,7 @@ For read, <input> is one or more record numbers (separated only by a comma) or\
 Options include:
 EOS
   opt :verbose, "Print success status for each item", :short => "-v"
+  opt :debug, "Save request URL and body to output log", :short => "-d"
   stop_on SUB_COMMANDS
 end
 
@@ -60,7 +61,7 @@ client = WC_METADATA_API::Client.new(
 )
 
 # Write to output file
-def log_output(response_data, response_status, cmd, successes, failures)
+def log_output(response_data, response_status, debug_info, cmd, successes, failures)
   any_records = (successes > 0 ? true : false) # Check for any successes
   
   time = Time.now
@@ -75,6 +76,7 @@ def log_output(response_data, response_status, cmd, successes, failures)
   
   s_filename = "wc-" + cmd + "-" + t + "-log.txt"
   s = File.new(s_filename, "w+:UTF-8")
+  s.write(debug_info)
   s.write(response_status)
   s.close
  
@@ -100,10 +102,11 @@ cmd_opts = case cmd
   when "read"
     Clop::die "OCLC record number(s) required" if ARGV.empty?
     input = ARGV.shift
-    response_status = ""
+    response_status = "RESULT(S)\n\n"
     response_data = Nokogiri::XML::Document.parse(
       "<collection xmlns=\"http://www.loc.gov/MARC21/slim\">"
     )
+    debug_info = "CLIENT REQUEST(S)"
     numbers = []
 
     # Extract digit strings from file or command-line input
@@ -123,6 +126,7 @@ cmd_opts = case cmd
         :schema => c["schema"],
         :instSymbol => c["instSymbol"]
       )
+      debug_info << client.debug_info + "\n\n" if global_opts[:debug]
       rc = Nokogiri::XML::Document.parse(client.LastResponseCode.body)
       if client.LastResponseCode.code == "200"
         response_data.root << rc.at_xpath("//marc:record",
@@ -139,13 +143,13 @@ cmd_opts = case cmd
       end
     end
  
-    log_output(response_data, response_status, cmd, successes, failures)
+    log_output(response_data, response_status, debug_info, cmd, successes, failures)
 
   # Create API operation
   when "create"
     Clop::die "Filename of MARCXML record(s) required" if ARGV.empty?
     input = Nokogiri::XML(File.read(ARGV.shift))
-    response_status = ""
+    response_status = "RESULT(S)\n\n"
     response_data = Nokogiri::XML::Document.parse(
       "<collection xmlns=\"http://www.loc.gov/MARC21/slim\">"
     )
@@ -153,9 +157,10 @@ cmd_opts = case cmd
       "marc" => "http://www.loc.gov/MARC21/slim"
     )
     Clop::die "No well-formed MARCXML records found as input" if count == 0
+    debug_info = "CLIENT REQUEST(S)"
     records = {}
     
-    # Submit records
+    # Extract records into hash
     input.xpath("//marc:record", 
       "marc" => "http://www.loc.gov/MARC21/slim"
     ).each do |record|
@@ -165,6 +170,7 @@ cmd_opts = case cmd
         records[id] = record
       end
 
+    # Submit records
     records.each_pair do |id, record|
       if record.namespace_definitions.length == 0
         record["xmlns:marc"] = "http://www.loc.gov/MARC21/slim"
@@ -175,6 +181,7 @@ cmd_opts = case cmd
         :instSymbol => c["instSymbol"],
         :xRecord => record.to_s
       )
+      debug_info << client.debug_info + "\n\n" + record.to_s + "\n\n" if global_opts[:debug]
       rc = Nokogiri::XML::Document.parse(client.LastResponseCode.body)
       if client.LastResponseCode.code == "201"
         response_data.root << rc.at_xpath("//marc:record",
@@ -191,7 +198,7 @@ cmd_opts = case cmd
       end
     end
    
-    log_output(response_data, response_status, cmd, successes, failures)
+    log_output(response_data, response_status, debug_info, cmd, successes, failures)
     
   # Any other command
   else
