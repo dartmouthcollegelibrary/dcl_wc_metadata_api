@@ -16,7 +16,7 @@
 
 require_relative '../lib/dcl_wc_metadata_api'
 
-#TODO: Refactor single/multiple operations as functions or child classes
+#TODO: Enhance subcommand parsing to allow options after subcommand
 
 # Define command-line options and documentation
 SUB_COMMANDS = %w(read create)
@@ -31,13 +31,15 @@ Commands include:
   read    Download record(s) from OCLC
   create  Upload new record(s) to OCLC
 
-For read, <input> is a numeric record number or the path of a file containing a\
- list of numeric record numbers. For create, <input> is the path of a valid\
- MARCXML file containing one or more records.
+For read, <input> is one or more record numbers (separated only by a comma) or\
+ the path of a file containing a list of record numbers, one per line. For\
+ create, <input> is the path of a valid MARCXML file containing one or more\
+ records.
 
 Options include:
 EOS
   opt :verbose, "Print success status for each item", :short => "-v"
+  opt :debug, "Save request URL and body to output log", :short => "-d"
   stop_on SUB_COMMANDS
 end
 
@@ -58,7 +60,7 @@ client = WC_METADATA_API::Client.new(
 )
 
 # Write to output file
-def log_output(response_data, response_status, cmd, successes, failures)
+def log_output(response_data, response_status, debug_info, cmd, successes, failures)
   any_records = (successes > 0 ? true : false) # Check for any successes
   
   time = Time.now
@@ -73,6 +75,7 @@ def log_output(response_data, response_status, cmd, successes, failures)
   
   s_filename = "wc-" + cmd + "-" + t + "-log.txt"
   s = File.new(s_filename, "w+:UTF-8")
+  s.write(debug_info)
   s.write(response_status)
   s.close
  
@@ -80,7 +83,7 @@ def log_output(response_data, response_status, cmd, successes, failures)
     
   puts "OCLC WorldCat Metadata API: " + cmd.capitalize + " operation"
   puts verbs[cmd] + " " + successes.to_s + \
-    (successes > 1 ? " records, " : " record, ") + failures.to_s + " failed"
+    (successes != 1 ? " records, " : " record, ") + failures.to_s + " failed"
   puts "Records written to " + d_filename if any_records
   puts "Log written to " + s_filename
 end
@@ -98,159 +101,103 @@ cmd_opts = case cmd
   when "read"
     Clop::die "OCLC record number(s) required" if ARGV.empty?
     input = ARGV.shift
-    response_status = ""
+    response_status = "RESULT(S)\n\n"
     response_data = Nokogiri::XML::Document.parse(
       "<collection xmlns=\"http://www.loc.gov/MARC21/slim\">"
     )
+    debug_info = "CLIENT REQUEST(S)"
+    numbers = []
 
-    case input
- 
-    # Single record number
-    when /^[\d]+$/ #TODO: Extract digit string
+    # Extract digit strings from file or command-line input
+    if File.exists?(input)
+      File.open(input, "r").each { |line| 
+        line.scan(/[\d]+/) { |match| numbers << match }
+      }
+    else
+      input.scan(/[\d]+/) { |match| numbers << match }
+    end
+    
+    # Retrieve records
+    numbers.each do |number|        
       r = client.WorldCatGetBibRecord(
-        :oclcNumber => input,
+        :oclcNumber => number,
         :holdingLibraryCode => c["holdingLibraryCode"],
         :schema => c["schema"],
         :instSymbol => c["instSymbol"]
       )
+      debug_info << client.debug_info + "\n\n" if global_opts[:debug]
       rc = Nokogiri::XML::Document.parse(client.LastResponseCode.body)
       if client.LastResponseCode.code == "200"
         response_data.root << rc.at_xpath("//marc:record",
             "marc" => "http://www.loc.gov/MARC21/slim"
         )
-        response_status << input + ": read\n"
-        puts input + ": found" if global_opts[:verbose]
+        response_status << number + ": read\n"
+        puts number + ": found" if global_opts[:verbose]
         successes += 1
       else
-        response_status << input + ": failed\n"
+        response_status << number + ": failed\n"
         response_status << rc.to_s
-        puts input + ": failed" if global_opts[:verbose]
+        puts number + ": failed" if global_opts[:verbose]
         failures += 1
       end
-  
-    # List of record numbers in file
-    else
-      numbers = []    
-      File.open(input, "r").each { |line| 
-        line.scan(/[\d]+/) { |match| numbers << match } # Extract digit strings
-      }
-      
-      numbers.each do |number|        
-        r = client.WorldCatGetBibRecord(
-          :oclcNumber => number,
-          :holdingLibraryCode => c["holdingLibraryCode"],
-          :schema => c["schema"],
-          :instSymbol => c["instSymbol"]
-        )
-        rc = Nokogiri::XML::Document.parse(client.LastResponseCode.body)
-        if client.LastResponseCode.code == "200"
-          response_data.root << rc.at_xpath("//marc:record",
-              "marc" => "http://www.loc.gov/MARC21/slim"
-          )
-          response_status << number + ": read\n"
-          puts number + ": found" if global_opts[:verbose]
-          successes += 1
-        else
-          response_status << number + ": failed\n"
-          response_status << rc.to_s
-          puts number + ": failed" if global_opts[:verbose]
-          failures += 1
-        end
-      end
-      
-      #TODO: Multiple record numbers on command line?
     end
  
-    log_output(response_data, response_status, cmd, successes, failures)
+    log_output(response_data, response_status, debug_info, cmd, successes, failures)
 
   # Create API operation
   when "create"
     Clop::die "Filename of MARCXML record(s) required" if ARGV.empty?
     input = Nokogiri::XML(File.read(ARGV.shift))
-    response_status = ""
+    response_status = "RESULT(S)\n\n"
     response_data = Nokogiri::XML::Document.parse(
       "<collection xmlns=\"http://www.loc.gov/MARC21/slim\">"
     )
     count = input.xpath("count(//marc:record)",
       "marc" => "http://www.loc.gov/MARC21/slim"
     )
-     
-    case count
+    Clop::die "No well-formed MARCXML records found as input" if count == 0
+    debug_info = "CLIENT REQUEST(S)"
+    records = {}
     
-    # No well-formed records
-    when 0
-      puts "Create operation: No MARCXML records found as input"
-    
-    # Single record
-    when 1
+    # Extract records into hash
+    input.xpath("//marc:record", 
+      "marc" => "http://www.loc.gov/MARC21/slim"
+    ).each do |record|
+        id = record.at_xpath(
+          "marc:datafield[@tag='035']/marc:subfield[@code='a']",
+          "marc" => "http://www.loc.gov/MARC21/slim").text
+        records[id] = record
+      end
+
+    # Submit records
+    records.each_pair do |id, record|
+      if record.namespace_definitions.length == 0
+        record["xmlns:marc"] = "http://www.loc.gov/MARC21/slim"
+      end
       r = client.WorldCatAddBibRecord(
         :holdingLibraryCode => c["holdingLibraryCode"],
         :schema => c["schema"],
         :instSymbol => c["instSymbol"],
-        :xRecord => input.to_s
+        :xRecord => record.to_s
       )
+      debug_info << client.debug_info + "\n\n" + record.to_s + "\n\n" if global_opts[:debug]
       rc = Nokogiri::XML::Document.parse(client.LastResponseCode.body)
       if client.LastResponseCode.code == "201"
         response_data.root << rc.at_xpath("//marc:record",
             "marc" => "http://www.loc.gov/MARC21/slim"
         )
-        id = input.at_xpath(
-          "//marc:record/marc:datafield[@tag='035']/marc:subfield[@code='a']",
-          "marc" => "http://www.loc.gov/MARC21/slim").text
         response_status << id + ": created\n"
         puts id + ": created" if global_opts[:verbose]
         successes += 1
       else
-        id = input.at_xpath(
-          "//marc:record/marc:datafield[@tag='035']/marc:subfield[@code='a']",
-          "marc" => "http://www.loc.gov/MARC21/slim").text
         response_status << id + ": failed\n"
         response_status << rc.to_s
         puts id + ": failed" if global_opts[:verbose]
         failures += 1
       end
-    
-    # Multiple records
-    else
-      records = {}
-      input.xpath("//marc:record", 
-        "marc" => "http://www.loc.gov/MARC21/slim"
-      ).each do |record|
-          id = record.at_xpath(
-            "marc:datafield[@tag='035']/marc:subfield[@code='a']",
-            "marc" => "http://www.loc.gov/MARC21/slim").text
-          records[id] = record
-        end
-
-      records.each_pair do |id, record|
-        record["xmlns:marc"] = "http://www.loc.gov/MARC21/slim"    
-        r = client.WorldCatAddBibRecord(
-          :holdingLibraryCode => c["holdingLibraryCode"],
-          :schema => c["schema"],
-          :instSymbol => c["instSymbol"],
-          :xRecord => record.to_s
-        )
-        rc = Nokogiri::XML::Document.parse(client.LastResponseCode.body)
-        if client.LastResponseCode.code == "201"
-          response_data.root << rc.at_xpath("//marc:record",
-              "marc" => "http://www.loc.gov/MARC21/slim"
-          )
-          response_status << id + ": created\n"
-          puts id + ": created" if global_opts[:verbose]
-          successes += 1
-        else
-          response_status << id + ": failed\n"
-          response_status << rc.to_s
-          puts id + ": failed" if global_opts[:verbose]
-          failures += 1
-        end
-      end
-
     end
    
-    if count > 0
-      log_output(response_data, response_status, cmd, successes, failures)
-    end
+    log_output(response_data, response_status, debug_info, cmd, successes, failures)
     
   # Any other command
   else
