@@ -45,53 +45,10 @@ end
 
 input = ""
 
-# Set up API client
-credentials = YAML.load(
-  File.open(File.dirname(__FILE__) + "/../config/credentials.yml", "r")
-)
-c = credentials["credentials"]
-
-client = WC_METADATA_API::Client.new(
-  :wskey => c["key"],
-  :secret => c["secret"],
-  :principalID => c["principalid"],
-  :principalDNS => c["principaldns"],
-  :debug => false
-)
-
-# Write to output file
-def log_output(response_data, response_status, debug_info, cmd, successes, failures)
-  any_records = (successes > 0 ? true : false) # Check for any successes
-  
-  time = Time.now
-  t = time.strftime("%Y%m%d%H%M%S")
- 
-  if any_records
-    d_filename = "wc-" + cmd + "-" + t + ".xml"
-    d = File.new(d_filename, "w+:UTF-8")
-    d.write(response_data)
-    d.close
-  end
-  
-  s_filename = "wc-" + cmd + "-" + t + "-log.txt"
-  s = File.new(s_filename, "w+:UTF-8")
-  s.write(debug_info)
-  s.write(response_status)
-  s.close
- 
-  verbs = { "read" => "Read", "create" => "Created" }
-    
-  puts "OCLC WorldCat Metadata API: " + cmd.capitalize + " operation"
-  puts verbs[cmd] + " " + successes.to_s + \
-    (successes != 1 ? " records, " : " record, ") + failures.to_s + " failed"
-  puts "Records written to " + d_filename if any_records
-  puts "Log written to " + s_filename
-end
+manager = DCL_WC_METADATA_API::Manager.new(global_opts)
 
 # Parse command-line input
 cmd = ARGV.shift
-successes = 0
-failures = 0
 cmd_opts = case cmd
 
   when nil
@@ -101,103 +58,17 @@ cmd_opts = case cmd
   when "read"
     Clop::die "OCLC record number(s) required" if ARGV.empty?
     input = ARGV.shift
-    response_status = "RESULT(S)\n\n"
-    response_data = Nokogiri::XML::Document.parse(
-      "<collection xmlns=\"http://www.loc.gov/MARC21/slim\">"
-    )
-    debug_info = "CLIENT REQUEST(S)"
-    numbers = []
-
-    # Extract digit strings from file or command-line input
-    if File.exists?(input)
-      File.open(input, "r").each { |line| 
-        line.scan(/[\d]+/) { |match| numbers << match }
-      }
-    else
-      input.scan(/[\d]+/) { |match| numbers << match }
-    end
-    
-    # Retrieve records
-    numbers.each do |number|        
-      r = client.WorldCatGetBibRecord(
-        :oclcNumber => number,
-        :holdingLibraryCode => c["holdingLibraryCode"],
-        :schema => c["schema"],
-        :instSymbol => c["instSymbol"]
-      )
-      debug_info << client.debug_info + "\n\n" if global_opts[:debug]
-      rc = Nokogiri::XML::Document.parse(client.LastResponseCode.body)
-      if client.LastResponseCode.code == "200"
-        response_data.root << rc.at_xpath("//marc:record",
-            "marc" => "http://www.loc.gov/MARC21/slim"
-        )
-        response_status << number + ": read\n"
-        puts number + ": found" if global_opts[:verbose]
-        successes += 1
-      else
-        response_status << number + ": failed\n"
-        response_status << rc.to_s
-        puts number + ": failed" if global_opts[:verbose]
-        failures += 1
-      end
-    end
- 
-    log_output(response_data, response_status, debug_info, cmd, successes, failures)
+    manager.read(input)
 
   # Create API operation
   when "create"
     Clop::die "Filename of MARCXML record(s) required" if ARGV.empty?
     input = Nokogiri::XML(File.read(ARGV.shift))
-    response_status = "RESULT(S)\n\n"
-    response_data = Nokogiri::XML::Document.parse(
-      "<collection xmlns=\"http://www.loc.gov/MARC21/slim\">"
-    )
     count = input.xpath("count(//marc:record)",
       "marc" => "http://www.loc.gov/MARC21/slim"
     )
     Clop::die "No well-formed MARCXML records found as input" if count == 0
-    debug_info = "CLIENT REQUEST(S)"
-    records = {}
-    
-    # Extract records into hash
-    input.xpath("//marc:record", 
-      "marc" => "http://www.loc.gov/MARC21/slim"
-    ).each do |record|
-        id = record.at_xpath(
-          "marc:datafield[@tag='035']/marc:subfield[@code='a']",
-          "marc" => "http://www.loc.gov/MARC21/slim").text
-        records[id] = record
-      end
-
-    # Submit records
-    records.each_pair do |id, record|
-      if record.namespace_definitions.length == 0
-        record["xmlns:marc"] = "http://www.loc.gov/MARC21/slim"
-      end
-      r = client.WorldCatAddBibRecord(
-        :holdingLibraryCode => c["holdingLibraryCode"],
-        :schema => c["schema"],
-        :instSymbol => c["instSymbol"],
-        :xRecord => record.to_s
-      )
-      debug_info << client.debug_info + "\n\n" + record.to_s + "\n\n" if global_opts[:debug]
-      rc = Nokogiri::XML::Document.parse(client.LastResponseCode.body)
-      if client.LastResponseCode.code == "201"
-        response_data.root << rc.at_xpath("//marc:record",
-            "marc" => "http://www.loc.gov/MARC21/slim"
-        )
-        response_status << id + ": created\n"
-        puts id + ": created" if global_opts[:verbose]
-        successes += 1
-      else
-        response_status << id + ": failed\n"
-        response_status << rc.to_s
-        puts id + ": failed" if global_opts[:verbose]
-        failures += 1
-      end
-    end
-   
-    log_output(response_data, response_status, debug_info, cmd, successes, failures)
+    manager.create(input)
     
   # Any other command
   else
