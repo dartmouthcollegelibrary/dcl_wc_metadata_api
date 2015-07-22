@@ -28,7 +28,7 @@ module WC_METADATA_API
   class Client
   
     def is_success?
-      @LastResponseCode.code == "200" || @LastResponseCode.code == "201"
+      @LastResponseCode.code.start_with?("2") # 200, 201, 207
     end
     
   end
@@ -49,6 +49,7 @@ module DCL_WC_METADATA_API
     XMLNS_MARC = "http://www.loc.gov/MARC21/slim"
     RECORD_XPATH = "//marc:record"
     ID_XPATH = "marc:datafield[@tag='035']/marc:subfield[@code='a']"
+    WC_URL_XPATH = "//xmlns:id" # In returned Atom XML wrapper
     PAST_TENSE = { "read" => "read", "create" => "created" }
         
     def initialize(options={})
@@ -103,7 +104,8 @@ module DCL_WC_METADATA_API
     end
     
     # Handle success or failure for each API call
-    def manage_result(id, result)
+    # TODO?: Use caller_locations(1,1)[0].label instead of @cmd
+    def manage_record_result(id, result)
       if @client.is_success?
         @response_data.root << result.at_xpath(RECORD_XPATH,
           "marc" => XMLNS_MARC
@@ -116,6 +118,19 @@ module DCL_WC_METADATA_API
         @response_status << result.to_s
         puts id + ": failed" if @global_opts[:verbose]
         @failures += 1
+      end
+    end
+    
+    def manage_holding_result(id, result)
+      if @client.is_success?
+        @response_status << id + ": holding set\n"
+        puts id + ": holding set" if @global_opts[:verbose]
+        #@successes += 1
+      else
+        @response_status << id + ": set holding failed\n"
+        @response_status << result.to_s
+        puts id + ": set holding failed" if @global_opts[:verbose]
+        #@failures += 1
       end
     end
     
@@ -143,7 +158,8 @@ module DCL_WC_METADATA_API
         )
         @debug_info << @client.debug_info + "\n\n"
         rc = Nokogiri::XML::Document.parse(@client.LastResponseCode.body)
-        manage_result(number, rc)
+        manage_record_result(number, rc)
+        
       end
    
       log_output
@@ -153,6 +169,7 @@ module DCL_WC_METADATA_API
     def create(input)
       @cmd = "create"
       records = {}
+      numbers = []
       
       # Extract records into hash
       input.xpath(RECORD_XPATH, "marc" => XMLNS_MARC).each do |record|
@@ -173,10 +190,34 @@ module DCL_WC_METADATA_API
         )
         @debug_info << @client.debug_info + "\n\n" + record.to_s + "\n\n"
         rc = Nokogiri::XML::Document.parse(@client.LastResponseCode.body)
-        manage_result(id, rc)
+        manage_record_result(id, rc)
+        number = rc.at_xpath(WC_URL_XPATH)
+        numbers << number.to_s.slice(/[\d]+/)
       end
+      
+      # Call holdings operation
+      set_holdings(numbers)
      
       log_output
+    end
+    
+    # Set holdings API operation
+    # TODO: Write as stand-alone for set of pre-existing OCLC numbers
+    # TODO: Use holdings resource batch set functionality
+    def set_holdings(input)
+      
+      input.each do |number|
+        hr = client.WorldCatAddHoldings(
+          :oclcNumber => number,
+          :holdingLibraryCode => @credentials["holdingLibraryCode"],
+          :schema => @credentials["schema"],
+          :instSymbol => @credentials["instSymbol"]
+        )
+        @debug_info << @client.debug_info + "\n\n"
+        hrc = Nokogiri::XML::Document.parse(@client.LastResponseCode.body)
+        manage_holding_result(number, hrc)
+      end
+        
     end
 
   end

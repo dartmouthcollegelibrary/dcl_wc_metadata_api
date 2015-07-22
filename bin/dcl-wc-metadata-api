@@ -29,7 +29,7 @@ Usage:
 
 Commands include:
   read    Download record(s) from OCLC
-  create  Upload new record(s) to OCLC
+  create  Upload new record(s) to OCLC and set holding(s)
 
 For read, <input> is one or more record numbers (separated only by a comma) or\
  the path of a file containing a list of record numbers, one per line. For\
