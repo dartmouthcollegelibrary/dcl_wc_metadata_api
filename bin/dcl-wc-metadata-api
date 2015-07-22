@@ -40,6 +40,8 @@ Options include:
 EOS
   opt :verbose, "Print success status for each item", :short => "-v"
   opt :debug, "Save request URL and body to output log", :short => "-d"
+  opt :prefix, "Append string to output filenames", :type => String, 
+    :short => "-p"
   stop_on SUB_COMMANDS
 end
 

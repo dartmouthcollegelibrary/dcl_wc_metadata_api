@@ -78,19 +78,20 @@ module DCL_WC_METADATA_API
     
     # Write to output file
     def log_output()
+      prefix = @global_opts[:prefix] ? (@global_opts[:prefix] + "-") : ""
       any_records = (@successes > 0 ? true : false) # Check for any successes
       t = Time.now.strftime("%Y%m%d%H%M%S")
       
       # Data
       if any_records
-        d_filename = "wc-" + @cmd + "-" + t + ".xml"
+        d_filename = prefix + "wc-" + @cmd + "-" + t + ".xml"
         d = File.new(d_filename, "w+:UTF-8")
         d.write(@response_data)
         d.close
       end
       
       # Status log
-      s_filename = "wc-" + @cmd + "-" + t + "-log.txt"
+      s_filename = prefix + "wc-" + @cmd + "-" + t + "-log.txt"
       s = File.new(s_filename, "w+:UTF-8")
       s.write(@debug_info) if @global_opts[:debug]
       s.write(@response_status)
