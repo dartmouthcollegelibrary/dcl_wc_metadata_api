@@ -1,60 +1,105 @@
-wc_metadata_api
-===============
+# dcl_wc_metadata_api
 
-Ruby wrapper around the WorldCat Metadata API
+WorldCat Metadata API command-line Ruby executable. Intended to support batch creation and download of records in MARCXML. Developed for and in production use at the Dartmouth College Library.
 
-Dependencies:
-* Requires the OCLC Auth gem.  Get from: https://github.com/OCLC-Developer-Network/oclc-auth-ruby before building.
+Built upon Terry Reese's [wc-metadata-api](https://github.com/reeset/wc_metadata_api/) and OCLC's [oclc-auth-ruby](https://github.com/OCLC-Developer-Network/oclc-auth-ruby). Bundled with copies of those libraries, distributed under the Apache 2.0 license.
 
-Test files are found in the tests directories.  Demonstrates all the functions.
+Suggestions, comments, or questions? Contact Shaun Akhtar at shaun.y.akhtar@dartmouth.edu.
 
-At this point, the gem is light on the exception handling.  The current todo:
-1) Add better exception handling
-2) Include helper functions to simplify data processing and reading (so you don't have to just deal with MARCXML)
+## Usage
 
-Example:
-** Get a Bib Record
-require 'rubygems'
-require 'wc_metadata_api'
+  dcl-wc-metadata-api [options] <command> <input>
 
+Commands include:
 
-key = '[your key]'
-secret = '[your secret]'
-principalid = '[your principal_id]'
-principaldns = '[your principal_idns]'
-schema = 'LibraryOfCongress'
-holdingLibraryCode='[your holding code]'
-instSymbol = '[your oclc symbol]'
+* `read`: Download record(s) from OCLC
+* `create`: Upload new record(s) to OCLC and set holding(s)
 
+For read, `<input>` is one or more OCLC numbers (separated only by a comma) or the path of a file containing a list of OCLC numbers, one per line.
 
-client = WC_METADATA_API::Client.new(:wskey => key, :secret => secret, :principalID => principalid, :principalDNS => principaldns, :debug =>false)
+For create, `<input>` is the path of a valid MARCXML file containing one or more records.
 
+All records downloaded by a command are saved to a single file in the current working directory.
 
-response = client.WorldCatGetBibRecord(:oclcNumber => '879376100', :holdingLibraryCode => holdingLibraryCode, :schema => schema, :instSymbol => instSymbol)
+Options include:
 
+* `-v, --verbose`: Print success status for each item
+* `-d, --debug`: Save request URL and body to output log
+* `-p, --prefix=<s>`: Append string to output filenames
+* `-h, --help`: Show this message
 
-puts response
+## Examples
 
+### Retrieve records from text file containing OCLC numbers
 
-** Get Local Bib Record
-require 'rubygems'
-require 'wc_metadata_api'
+```
+# numbers.txt
 
+908406310
+908450886
+9000000000000 # Not (yet) a real record number
+908450913
+```
 
-key = '[your key]'
-secret = '[your secret]'
-principalid = '[your principal_id]'
-principaldns = '[your principal_idns]'
-schema = 'LibraryOfCongress'
-holdingLibraryCode='[your holding code]'
-instSymbol = '[your oclc symbol]'
+```
+$ dcl-wc-metadata-api -v read numbers.txt
 
+908406310: read
+908450886: read
+9000000000000: failed
+908450913: read
+OCLC WorldCat Metadata API: Read operation
+Read 3 records, 1 failed
+Records written to wc-read-20150723112649.xml
+Log written to wc-read-20150723112649-log.txt
+```
 
-client = WC_METADATA_API::Client.new(:wskey => key, :secret => secret, :principalID => principalid, :principalDNS => principaldns, :debug =>false)
+```xml
+# wc-read-20150723112649.xml
 
+<?xml version="1.0"?>
+<collection xmlns="http://www.loc.gov/MARC21/slim">
+  <record>
+        <leader>00000nkm a2200000Ki 4500</leader>
+        <controlfield tag="001">ocn908406310</controlfield>
+...
+```
 
-response = client.WorldCatReadLocalBibRecord(:oclcNumber =>'338544583', :schema => schema, :holdingLibraryCode => holdingLibraryCode, :instSymbol => instSymbol)
-puts response
+```xml
+# wc-read-20150723112649-log.txt
 
+RESULT(S)
 
-Questions: reeset@gmail.com
+908406310: read
+908450886: read
+9000000000000: failed
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<error xmlns="http://worldcat.org/xmlschemas/response">
+    <code type="application">WS-404</code>
+    <message>Unable to locate resource: 9000000000000.</message>
+</error>
+908450913: read
+```
+
+## Installation
+
+Requires Ruby 2.0.0 or greater.
+
+```
+git clone https://github.com/akhtars/dcl_wc_metadata_api.git
+cd dcl_wc_metadata_api
+gem install dcl_wc_metadata_api-<VERSION-NUMBER>.gem
+```
+
+External dependencies:
+
+* json
+* nokogiri
+* rest-client
+
+## API Key and Institutional Data Configuration
+
+A [WSKey](https://platform.worldcat.org/wskey/) with production environment credentials for the WorldCat Metadata API is required. For general information about WSKeys, see the [OCLC Developer Network site](https://www.oclc.org/developer/home.en.html).
+
+key, secret, principalID, principalDNS, holdingLibraryCode, instSymbol
+
