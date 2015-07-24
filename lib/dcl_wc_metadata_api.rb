@@ -77,7 +77,7 @@ module DCL_WC_METADATA_API
       )
       @credentials = credentials["credentials"]
       
-      # Validate credentials format
+      # Check credentials for "{" and "}" left over from placeholder strings
       invalid_credentials = {}
       @credentials.each_pair do |key, value|
         if value.include?("{") || value.include?("}")
@@ -202,8 +202,13 @@ module DCL_WC_METADATA_API
       numbers = []
       
       # Extract records into hash
-      input.xpath(RECORD_XPATH, "marc" => XMLNS_MARC).each do |record|
-        id = record.at_xpath(ID_XPATH, "marc" => XMLNS_MARC).text
+      set = input.xpath(RECORD_XPATH, "marc" => XMLNS_MARC)
+      set.each do |record|
+        if record.at_xpath(ID_XPATH, "marc" => XMLNS_MARC).nil?
+          id = set.index(record).to_s # Use record's index as backup ID
+        else
+          id = record.at_xpath(ID_XPATH, "marc" => XMLNS_MARC).text
+        end
         records[id] = record
       end
       
