@@ -51,7 +51,7 @@ module DCL_WC_METADATA_API
     ID_XPATH = "marc:datafield[@tag='035']/marc:subfield[@code='a']"
     WC_URL_XPATH = "//xmlns:id" # In returned Atom XML wrapper
     PAST_TENSE = { "read" => "read", "create" => "created" }
-        
+    
     def initialize(options={})
       @global_opts = options # Provided via command line
       @debug_info = "CLIENT REQUEST(S)"
@@ -70,8 +70,8 @@ module DCL_WC_METADATA_API
       @client = WC_METADATA_API::Client.new(
         :wskey => @credentials["key"],
         :secret => @credentials["secret"],
-        :principalID => @credentials["principalid"],
-        :principalDNS => @credentials["principaldns"],
+        :principalID => @credentials["principalID"],
+        :principalDNS => @credentials["principalDNS"],
         :debug => false
       )
     end
@@ -96,7 +96,7 @@ module DCL_WC_METADATA_API
       s.write(@debug_info) if @global_opts[:debug]
       s.write(@response_status)
       s.close
-     
+      
       puts "OCLC WorldCat Metadata API: " + @cmd.capitalize + " operation"
       puts PAST_TENSE[@cmd].capitalize + " " + @successes.to_s + \
         (@successes != 1 ? " records, " : " record, ") + @failures.to_s + " failed"
@@ -105,7 +105,6 @@ module DCL_WC_METADATA_API
     end
     
     # Handle success or failure for each API call
-    # TODO?: Use caller_locations(1,1)[0].label instead of @cmd
     def manage_record_result(id, result)
       if @client.is_success?
         @response_data.root << result.at_xpath(RECORD_XPATH,
@@ -139,10 +138,10 @@ module DCL_WC_METADATA_API
     def read(input)
       @cmd = "read"
       numbers = []
-
+      
       # Extract digit strings from file or command-line input
       if File.exists?(input)
-        File.open(input, "r").each { |line| 
+        File.open(input, "r").each { |line|
           line.scan(/[\d]+/) { |match| numbers << match }
         }
       else
@@ -150,7 +149,7 @@ module DCL_WC_METADATA_API
       end
       
       # Retrieve records
-      numbers.each do |number|        
+      numbers.each do |number|
         r = @client.WorldCatGetBibRecord(
           :oclcNumber => number,
           :holdingLibraryCode => @credentials["holdingLibraryCode"],
@@ -162,10 +161,10 @@ module DCL_WC_METADATA_API
         manage_record_result(number, rc)
         
       end
-   
+      
       log_output
     end
- 
+    
     # Create API operation
     def create(input)
       @cmd = "create"
@@ -177,7 +176,7 @@ module DCL_WC_METADATA_API
         id = record.at_xpath(ID_XPATH, "marc" => XMLNS_MARC).text
         records[id] = record
       end
-
+      
       # Submit records
       records.each_pair do |id, record|
         if record.namespace_definitions.length == 0
@@ -198,15 +197,13 @@ module DCL_WC_METADATA_API
       
       # Call holdings operation
       set_holdings(numbers)
-     
+      
       log_output
     end
     
     # Set holdings API operation
-    # TODO: Write as stand-alone for set of pre-existing OCLC numbers
-    # TODO: Use holdings resource batch set functionality
     def set_holdings(input)
-      
+    
       input.each do |number|
         hr = client.WorldCatAddHoldings(
           :oclcNumber => number,
@@ -218,9 +215,9 @@ module DCL_WC_METADATA_API
         hrc = Nokogiri::XML::Document.parse(@client.LastResponseCode.body)
         manage_holding_result(number, hrc)
       end
-        
+      
     end
-
+    
   end
 end
 
