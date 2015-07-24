@@ -28,7 +28,11 @@ module WC_METADATA_API
   class Client
   
     def is_success?
-      @LastResponseCode.code.start_with?("2") # 200, 201, 207
+      begin
+        @LastResponseCode.code.start_with?("2") # 200, 201, 207
+      rescue NoMethodError
+        return false
+      end
     end
     
   end
@@ -54,6 +58,9 @@ module DCL_WC_METADATA_API
     
     def initialize(options={})
       @global_opts = options # Provided via command line
+      
+      self.set_up_client()
+      
       @debug_info = "CLIENT REQUEST(S)"
       @response_status = "RESULT(S)\n\n"
       @response_data = Nokogiri::XML::Document.parse(
@@ -61,19 +68,38 @@ module DCL_WC_METADATA_API
       )
       @successes = 0
       @failures = 0
-      
-      # Set up API client
+    end
+    
+    # Set up API client
+    def set_up_client()
       credentials = YAML.load(
         File.open(File.dirname(__FILE__) + "/../config/credentials.yml", "r")
       )
       @credentials = credentials["credentials"]
-      @client = WC_METADATA_API::Client.new(
-        :wskey => @credentials["key"],
-        :secret => @credentials["secret"],
-        :principalID => @credentials["principalID"],
-        :principalDNS => @credentials["principalDNS"],
-        :debug => false
-      )
+      
+      # Validate credentials format
+      invalid_credentials = {}
+      @credentials.each_pair do |key, value|
+        if value.include?("{") || value.include?("}")
+          invalid_credentials[key] = value
+        end
+      end
+      
+      # Raise error or create client
+      if invalid_credentials.length > 0
+        ic = ""
+        invalid_credentials.each { |key, value| ic << "#{key}: #{value}\n" }
+        raise ArgumentError, "Some API credentials appear not to be set. " +
+          "Check values of the credentials below.\n#{ic}"
+      else
+        @client = WC_METADATA_API::Client.new(
+          :wskey => @credentials["key"],
+          :secret => @credentials["secret"],
+          :principalID => @credentials["principalID"],
+          :principalDNS => @credentials["principalDNS"],
+          :debug => false
+        )
+      end
     end
     
     # Write to output file
@@ -150,16 +176,20 @@ module DCL_WC_METADATA_API
       
       # Retrieve records
       numbers.each do |number|
-        r = @client.WorldCatGetBibRecord(
-          :oclcNumber => number,
-          :holdingLibraryCode => @credentials["holdingLibraryCode"],
-          :schema => @credentials["schema"],
-          :instSymbol => @credentials["instSymbol"]
-        )
-        @debug_info << @client.debug_info + "\n\n"
-        rc = Nokogiri::XML::Document.parse(@client.LastResponseCode.body)
-        manage_record_result(number, rc)
-        
+        begin
+          r = @client.WorldCatGetBibRecord(
+            :oclcNumber => number,
+            :holdingLibraryCode => @credentials["holdingLibraryCode"],
+            :schema => @credentials["schema"],
+            :instSymbol => @credentials["instSymbol"]
+          )
+          rc = Nokogiri::XML::Document.parse(@client.LastResponseCode.body)
+        rescue TypeError, URI::Error => e
+          @response_status << e.message + "\n"
+        ensure
+          @debug_info << @client.debug_info.to_s + "\n\n"
+          manage_record_result(number, rc)
+        end
       end
       
       log_output
@@ -179,20 +209,25 @@ module DCL_WC_METADATA_API
       
       # Submit records
       records.each_pair do |id, record|
-        if record.namespace_definitions.length == 0
-          record["xmlns:marc"] = XMLNS_MARC
+        begin
+          if record.namespace_definitions.length == 0
+            record["xmlns:marc"] = XMLNS_MARC
+          end
+          r = @client.WorldCatAddBibRecord(
+            :holdingLibraryCode => @credentials["holdingLibraryCode"],
+            :schema => @credentials["schema"],
+            :instSymbol => @credentials["instSymbol"],
+            :xRecord => record.to_s
+          )
+          rc = Nokogiri::XML::Document.parse(@client.LastResponseCode.body)
+          number = rc.at_xpath(WC_URL_XPATH)
+          numbers << number.to_s.slice(/[\d]+/)
+        rescue TypeError, URI::Error => e
+          @response_status << e.message + "\n"
+        ensure
+          @debug_info << @client.debug_info.to_s + "\n\n" + record.to_s + "\n\n"
+          manage_record_result(id, rc)
         end
-        r = @client.WorldCatAddBibRecord(
-          :holdingLibraryCode => @credentials["holdingLibraryCode"],
-          :schema => @credentials["schema"],
-          :instSymbol => @credentials["instSymbol"],
-          :xRecord => record.to_s
-        )
-        @debug_info << @client.debug_info + "\n\n" + record.to_s + "\n\n"
-        rc = Nokogiri::XML::Document.parse(@client.LastResponseCode.body)
-        manage_record_result(id, rc)
-        number = rc.at_xpath(WC_URL_XPATH)
-        numbers << number.to_s.slice(/[\d]+/)
       end
       
       # Call holdings operation
@@ -205,15 +240,20 @@ module DCL_WC_METADATA_API
     def set_holdings(input)
     
       input.each do |number|
-        hr = client.WorldCatAddHoldings(
-          :oclcNumber => number,
-          :holdingLibraryCode => @credentials["holdingLibraryCode"],
-          :schema => @credentials["schema"],
-          :instSymbol => @credentials["instSymbol"]
-        )
-        @debug_info << @client.debug_info + "\n\n"
-        hrc = Nokogiri::XML::Document.parse(@client.LastResponseCode.body)
-        manage_holding_result(number, hrc)
+        begin
+          hr = client.WorldCatAddHoldings(
+            :oclcNumber => number,
+            :holdingLibraryCode => @credentials["holdingLibraryCode"],
+            :schema => @credentials["schema"],
+            :instSymbol => @credentials["instSymbol"]
+          )
+          hrc = Nokogiri::XML::Document.parse(@client.LastResponseCode.body)
+        rescue TypeError, URI::Error => e
+          @response_status << e.message + "\n"
+        ensure
+          @debug_info << @client.debug_info.to_s + "\n\n"
+          manage_holding_result(number, hrc)
+        end
       end
       
     end
