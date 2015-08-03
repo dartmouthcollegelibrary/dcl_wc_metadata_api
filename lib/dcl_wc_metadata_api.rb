@@ -45,14 +45,64 @@ end
 
 module DCL_WC_METADATA_API
 
-  C_FILE = File.dirname(__FILE__) + "/../config/credentials.yml"
+  C_DIR = File.expand_path("../../config", __FILE__)
+  C_FILE = C_DIR + "/credentials.yml"
   
-  def load_credentials
-    
+  # Load credentials
+  def DCL_WC_METADATA_API.load_credentials
+    if File.exists?(C_FILE)
+      yaml = YAML.load(File.open(C_FILE, "r"))
+      yaml ? yaml["credentials"] : {}
+    else
+      {}
+    end
   end
   
-  def set_credentials(input)
+  # Check for presence of all required credentials
+  def DCL_WC_METADATA_API.validate_credentials
+    credentials = load_credentials
+    req_keys = ["key", "secret", "principalID", "principalDNS", "schema",
+      "holdingLibraryCode", "instSymbol"]
+    missing_keys = req_keys - credentials.keys
+    if missing_keys.empty?
+      credentials
+    else
+      Clop::die "Some API credentials appear not to be set." +
+        " Please set the values of: #{missing_keys.join(", ")}" +
+        " using the config command"
+    end
+  end
+  
+  # Display credentials
+  def DCL_WC_METADATA_API.display_credentials
+    credentials = load_credentials
+    if credentials.empty?
+      Clop::die "No credentials are set. Use the config command"
+    else
+      credentials.each { |key, value| puts "#{key}: #{value}\n" }
+    end
+  end
+  
+  # Set or update credentials
+  def DCL_WC_METADATA_API.set_credentials(input)
+    Dir.mkdir(C_DIR) if !Dir.exist?(C_DIR) # Create /config if it doesn't exist
     
+    new = {}
+    strings = input.select { |s| s.include?("=") } # Basic data validation
+    Clop::die "No <name>=<value> pairs found in input" if strings.length == 0
+    strings.each do |string|
+      pair = string.split("=", 2) # Limit because secrets may include "="
+      new[pair[0]] = pair[1]
+    end
+    
+    # Combine user input with any existing credentials and write to file
+    current = load_credentials
+    combined = !current.empty? ? current.merge(new) : new
+    credentials = { "credentials" => combined }
+    output = File.open(C_FILE, "w+")
+    YAML.dump(credentials, output)
+    output.close
+    puts "Credentials set."
   end
   
   class Manager
@@ -68,11 +118,17 @@ module DCL_WC_METADATA_API
     WC_URL_XPATH = "//xmlns:id" # In returned Atom XML wrapper
     PAST_TENSE = { "read" => "read", "create" => "created" }
     
+    # Set up API client
     def initialize(options={})
       @global_opts = options # Provided via command line
-      
-      self.set_up_client()
-      
+      @credentials = DCL_WC_METADATA_API.validate_credentials
+      @client = WC_METADATA_API::Client.new(
+        :wskey => @credentials["key"],
+        :secret => @credentials["secret"],
+        :principalID => @credentials["principalID"],
+        :principalDNS => @credentials["principalDNS"],
+        :debug => false
+      )
       @debug_info = "CLIENT REQUEST(S)"
       @response_status = "RESULT(S)\n\n"
       @response_data = Nokogiri::XML::Document.parse(
@@ -80,45 +136,6 @@ module DCL_WC_METADATA_API
       )
       @successes = 0
       @failures = 0
-    end
-    
-    # Set up API client
-    def set_up_client()
-      c_file = File.dirname(__FILE__) + "/../config/credentials.yml"
-      
-      if File.exists?(c_file)
-        credentials = YAML.load(
-          File.open(c_file, "r")
-        )
-        @credentials = credentials["credentials"]
-        
-        # Check credentials for "{" and "}" left over from placeholder strings
-        invalid_credentials = {}
-        @credentials.each_pair do |key, value|
-          if value.include?("{") || value.include?("}")
-            invalid_credentials[key] = value
-          end
-        end
-        
-        # Raise error or create client
-        if invalid_credentials.length > 0
-          ic = ""
-          invalid_credentials.each { |key, value| ic << "#{key}: #{value}\n" }
-          Clop::die "Some API credentials appear not to be set. " +
-            "Check values of the credentials below.\n#{ic}"
-        else
-          @client = WC_METADATA_API::Client.new(
-            :wskey => @credentials["key"],
-            :secret => @credentials["secret"],
-            :principalID => @credentials["principalID"],
-            :principalDNS => @credentials["principalDNS"],
-            :debug => false
-          )
-        end
-      
-      else
-        Clop::die "API credentials not set. Use config command"
-      end
     end
     
     # Write to output file
@@ -143,7 +160,7 @@ module DCL_WC_METADATA_API
       s.close
       
       puts "OCLC WorldCat Metadata API: " + @cmd.capitalize + " operation"
-      puts PAST_TENSE[@cmd].capitalize + " " + @successes.to_s + \
+      puts PAST_TENSE[@cmd].capitalize + " " + @successes.to_s +
         (@successes != 1 ? " records, " : " record, ") + @failures.to_s + " failed"
       puts "Records written to " + d_filename if any_records
       puts "Log written to " + s_filename

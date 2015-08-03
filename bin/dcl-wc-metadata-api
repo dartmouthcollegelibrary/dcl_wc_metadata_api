@@ -24,16 +24,16 @@ dcl-wc-metadata-api, DCL-local WorldCat Metadata API tools.
 
 Usage:
   dcl-wc-metadata-api [options] <command> <input>
-  dcl-wc-metadata-api config <name>=<value> [<name>=<value> ...]
-  dcl-wc-metadata-api config show
+  dcl-wc-metadata-api config [<name>=<value> ...]
 
 Commands include:
   read    Download record(s) from OCLC
   create  Upload new record(s) to OCLC and set holding(s)
   config  Set or display WSKey credentials and API preferences
 
-Before any other commands, config must be used to set the following fields:
- key, secret, principalID, principalDNS, schema, holdingLibraryCode, instSymbol
+Before any other commands, config must be used to set the following fields:\
+ key, secret, principalID, principalDNS, schema, holdingLibraryCode, instSymbol.\
+ Without any arguments, config displays the fields currently set.
 
 For definitions, see\
  http://www.oclc.org/developer/develop/web-services/worldcat-metadata-api/bibliographic-resource.en.html.
@@ -60,61 +60,31 @@ cmd_opts = case cmd
 
   when nil
     Clop::die "No command given. Select one of: " + SUB_COMMANDS.join(", ")
-    
+  
+  # Set or display credentials  
   when "config"
-    c_file = File.dirname(__FILE__) + "/../config/credentials.yml"
     config_cmd = ARGV
     
-    case
+    DCL_WC_METADATA_API.set_credentials(config_cmd) if !config_cmd.empty?
+    DCL_WC_METADATA_API.display_credentials
     
-    # Set API credentials
-    when config_cmd.to_s.include?("=")
-      # TODO: Merge with existing data - load existing data and compare keys
-      new_data = {}
-      config_cmd.each do |string|
-        pair = string.split("=", 2) # Strings may include "="
-        new_data[pair[0]] = pair[1]
-      end
-      credentials = { "credentials" => new_data }
-      c = File.open(c_file, "a+")
-      YAML.dump(credentials, c)
-      
-    # Display API credentials
-    when config_cmd[0] == "show"
-      if File.exists?(c_file)
-        data = YAML.load(
-          File.open(c_file, "r")
-        )
-        credentials = data["credentials"]
-        credentials.each { |key, value| puts "#{key}: #{value}\n" }
-      else
-        Clop::die "API credentials not set. Use config <name>=<value> command"
-      end
-
-    end
-  
-  when "read" || "create"
+  # Read API operation
+  when "read"
+    Clop::die "OCLC record number(s) required" if ARGV.empty?
+    input = ARGV.shift
     manager = DCL_WC_METADATA_API::Manager.new(global_opts)
-
-    case
+    manager.read(input)
     
-    # Read API operation
-    when "read"
-      Clop::die "OCLC record number(s) required" if ARGV.empty?
-      input = ARGV.shift
-      manager.read(input)
-      
-    # Create API operation
-    when "create"
-      Clop::die "Filename of MARCXML record(s) required" if ARGV.empty?
-      input = Nokogiri::XML(File.read(ARGV.shift))
-      count = input.xpath("count(//marc:record)",
-        "marc" => "http://www.loc.gov/MARC21/slim"
-      )
-      Clop::die "No well-formed MARCXML records found as input" if count == 0
-      manager.create(input)
-      
-    end
+  # Create API operation
+  when "create"
+    Clop::die "Filename of MARCXML record(s) required" if ARGV.empty?
+    input = Nokogiri::XML(File.read(ARGV.shift))
+    count = input.xpath("count(//marc:record)",
+      "marc" => "http://www.loc.gov/MARC21/slim"
+    )
+    Clop::die "No well-formed MARCXML records found as input" if count == 0
+    manager = DCL_WC_METADATA_API::Manager.new(global_opts)
+    manager.create(input)
     
   # Any other command
   else

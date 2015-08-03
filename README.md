@@ -1,6 +1,6 @@
 # dcl_wc_metadata_api
 
-WorldCat Metadata API command-line Ruby executable. Intended to support batch creation and download of records in MARCXML. Developed for and in production use at the Dartmouth College Library.
+Command-line Ruby executable for the Bibliographic Resource component of the [WorldCat Metadata API](http://www.oclc.org/developer/develop/web-services/worldcat-metadata-api.en.html). Intended to support batch creation and download of records in MARCXML. Developed for and in production use at the Dartmouth College Library.
 
 Built upon Terry Reese's [wc-metadata-api](https://github.com/reeset/wc_metadata_api/) and OCLC's [oclc-auth-ruby](https://github.com/OCLC-Developer-Network/oclc-auth-ruby). Bundled with copies of those libraries, distributed under the Apache 2.0 license.
 
@@ -9,11 +9,13 @@ Suggestions, comments, or questions? Contact Shaun Akhtar at shaun.y.akhtar@dart
 ## Usage
 
   dcl-wc-metadata-api [options] <command> <input>
+  dcl-wc-metadata-api config [<name>=<value> ...]
 
 Commands include:
 
 * `read`: Download record(s) from OCLC
 * `create`: Upload new record(s) to OCLC and set holding(s)
+* `config`: Set or display WSKey credentials and API preferences
 
 For read, `<input>` is one or more OCLC numbers (separated only by a comma) or the path of a file containing a list of OCLC numbers, one per line.
 
@@ -81,14 +83,62 @@ RESULT(S)
 908450913: read
 ```
 
+### Create in WorldCat and set holdings on a MARCXML record
+
+```xml
+# dwcposters-c078-marc.xml
+
+<?xml version="1.0" encoding="UTF-8"?>
+<marc:record xmlns:marc="http://www.loc.gov/MARC21/slim">
+   <marc:leader>     nkm  22     Ki 4500</marc:leader>
+   <marc:controlfield tag="007">cr||n|</marc:controlfield>
+   <marc:controlfield tag="008">150120s1938    xx |||| ||||| o|||ineng d</marc:controlfield>
+   <marc:datafield tag="035" ind1=" " ind2=" ">
+      <marc:subfield code="a">(DRB)dwcposters-c078</marc:subfield>
+   </marc:datafield>
+...
+```
+
+```
+$ dcl-wc-metadata-api create ~/Desktop/dcl-ruby/input/dwcposters-c078-marc.xml
+
+OCLC WorldCat Metadata API: Create operation
+Created 1 record, 0 failed
+Records written to wc-create-20150803155439.xml
+Log written to wc-create-20150803155439-log.txt
+```
+
+```xml
+# wc-create-20150803155439.xml
+
+<?xml version="1.0"?>
+<collection xmlns="http://www.loc.gov/MARC21/slim">
+  <record>
+        <leader>00000nkm a2200000Ki 4500</leader>
+        <controlfield tag="001">ocn915392573</controlfield>
+        <controlfield tag="003">OCoLC</controlfield>
+        <controlfield tag="005">20150803155434.9</controlfield>
+...
+```
+
+```
+# wc-create-20150803155439-log.txt
+
+RESULT(S)
+
+(DRB)dwcposters-c078: created
+915392573: holding set
+```
+
 ## Installation
 
 Requires Ruby 2.0.0 or greater.
 
 ```
-git clone https://github.com/akhtars/dcl_wc_metadata_api.git
-cd dcl_wc_metadata_api
-gem install dcl_wc_metadata_api-<VERSION-NUMBER>.gem
+$ git clone https://github.com/akhtars/dcl_wc_metadata_api.git
+$ cd dcl_wc_metadata_api
+$ gem build dcl_wc_metadata_api.gemspec
+$ gem install dcl_wc_metadata_api-<VERSION-NUMBER>.gem
 ```
 
 External dependencies:
@@ -101,5 +151,13 @@ External dependencies:
 
 A [WSKey](https://platform.worldcat.org/wskey/) with production environment credentials for the WorldCat Metadata API is required. For general information about WSKeys, see the [OCLC Developer Network site](https://www.oclc.org/developer/home.en.html).
 
-key, secret, principalID, principalDNS, holdingLibraryCode, instSymbol
+Before any other commands, config must be used to set the following fields: `key`, `secret`, `principalID`, `principalDNS`, `schema`, `holdingLibraryCode`, `instSymbol`. Without any arguments, config displays the fields currently set.
+
+Example:
+
+```
+$ dcl-wc-metadata-api config key=my-key secret=my-secret principalID=my-id principalDNS=my-dns schema=LibraryOfCongress holdingLibraryCode=DRBB instSymbol=DRB
+```
+
+Credentials are currently stored at /config/credentials.yml in the gem's installation directory.
 
