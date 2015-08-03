@@ -40,9 +40,21 @@ end
 
 # New module introduces a Manager class to iterate through the provided 
 # input, calling WC_METADATA_API::Client and recording response and status
-# information for each record or record number.
+# information for each record or record number. Also defines new methods
+# for setting and loading API credentials at config/credentials.yml.
 
 module DCL_WC_METADATA_API
+
+  C_FILE = File.dirname(__FILE__) + "/../config/credentials.yml"
+  
+  def load_credentials
+    
+  end
+  
+  def set_credentials(input)
+    
+  end
+  
   class Manager
   
     attr_reader :global_opts
@@ -72,33 +84,40 @@ module DCL_WC_METADATA_API
     
     # Set up API client
     def set_up_client()
-      credentials = YAML.load(
-        File.open(File.dirname(__FILE__) + "/../config/credentials.yml", "r")
-      )
-      @credentials = credentials["credentials"]
+      c_file = File.dirname(__FILE__) + "/../config/credentials.yml"
       
-      # Check credentials for "{" and "}" left over from placeholder strings
-      invalid_credentials = {}
-      @credentials.each_pair do |key, value|
-        if value.include?("{") || value.include?("}")
-          invalid_credentials[key] = value
-        end
-      end
-      
-      # Raise error or create client
-      if invalid_credentials.length > 0
-        ic = ""
-        invalid_credentials.each { |key, value| ic << "#{key}: #{value}\n" }
-        raise ArgumentError, "Some API credentials appear not to be set. " +
-          "Check values of the credentials below.\n#{ic}"
-      else
-        @client = WC_METADATA_API::Client.new(
-          :wskey => @credentials["key"],
-          :secret => @credentials["secret"],
-          :principalID => @credentials["principalID"],
-          :principalDNS => @credentials["principalDNS"],
-          :debug => false
+      if File.exists?(c_file)
+        credentials = YAML.load(
+          File.open(c_file, "r")
         )
+        @credentials = credentials["credentials"]
+        
+        # Check credentials for "{" and "}" left over from placeholder strings
+        invalid_credentials = {}
+        @credentials.each_pair do |key, value|
+          if value.include?("{") || value.include?("}")
+            invalid_credentials[key] = value
+          end
+        end
+        
+        # Raise error or create client
+        if invalid_credentials.length > 0
+          ic = ""
+          invalid_credentials.each { |key, value| ic << "#{key}: #{value}\n" }
+          Clop::die "Some API credentials appear not to be set. " +
+            "Check values of the credentials below.\n#{ic}"
+        else
+          @client = WC_METADATA_API::Client.new(
+            :wskey => @credentials["key"],
+            :secret => @credentials["secret"],
+            :principalID => @credentials["principalID"],
+            :principalDNS => @credentials["principalDNS"],
+            :debug => false
+          )
+        end
+      
+      else
+        Clop::die "API credentials not set. Use config command"
       end
     end
     
