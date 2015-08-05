@@ -132,7 +132,7 @@ RESULT(S)
 
 ## Installation
 
-Requires Ruby 2.0.0 or greater.
+Requires Ruby 2.0.0 or greater. Known to run on Linux. Windows support is forthcoming.
 
 ```
 $ git clone https://github.com/akhtars/dcl_wc_metadata_api.git

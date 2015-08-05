@@ -208,6 +208,7 @@ module DCL_WC_METADATA_API
         }
       else
         input.scan(/[\d]+/) { |match| numbers << match }
+        Clop::die "No record numbers found in input" if numbers.length == 0
       end
       
       # Retrieve records
@@ -220,7 +221,7 @@ module DCL_WC_METADATA_API
             :instSymbol => @credentials["instSymbol"]
           )
           rc = Nokogiri::XML::Document.parse(@client.LastResponseCode.body)
-        rescue TypeError, URI::Error => e
+        rescue NoMethodError, TypeError, URI::Error => e
           @response_status << e.message + "\n"
         ensure
           @debug_info << @client.debug_info.to_s + "\n\n"
@@ -263,7 +264,7 @@ module DCL_WC_METADATA_API
           rc = Nokogiri::XML::Document.parse(@client.LastResponseCode.body)
           number = rc.at_xpath(WC_URL_XPATH)
           numbers << number.to_s.slice(/[\d]+/)
-        rescue TypeError, URI::Error => e
+        rescue NoMethodError, TypeError, URI::Error => e
           @response_status << e.message + "\n"
         ensure
           @debug_info << @client.debug_info.to_s + "\n\n" + record.to_s + "\n\n"
@@ -289,7 +290,7 @@ module DCL_WC_METADATA_API
             :instSymbol => @credentials["instSymbol"]
           )
           hrc = Nokogiri::XML::Document.parse(@client.LastResponseCode.body)
-        rescue TypeError, URI::Error => e
+        rescue NoMethodError, TypeError, URI::Error => e
           @response_status << e.message + "\n"
         ensure
           @debug_info << @client.debug_info.to_s + "\n\n"
