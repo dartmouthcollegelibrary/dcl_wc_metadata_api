@@ -1,13 +1,13 @@
 #!/usr/bin/env ruby
 
 # Copyright 2015 Trustees of Dartmouth College
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -47,7 +47,7 @@ Options include:
 EOS
   opt :verbose, "Print success status for each item", :short => "-v"
   opt :debug, "Save request URL and body to output log", :short => "-d"
-  opt :prefix, "Append string to output filenames", :type => String, 
+  opt :prefix, "Append string to output filenames", :type => String,
     :short => "-p"
   stop_on SUB_COMMANDS
 end
@@ -60,21 +60,21 @@ cmd_opts = case cmd
 
   when nil
     Clop::die "No command given. Select one of: " + SUB_COMMANDS.join(", ")
-  
-  # Set or display credentials  
+
+  # Set or display credentials
   when "config"
     config_cmd = ARGV
-    
+
     DCL_WC_METADATA_API.set_credentials(config_cmd) if !config_cmd.empty?
     DCL_WC_METADATA_API.display_credentials
-    
+
   # Read API operation
   when "read"
     Clop::die "OCLC record number(s) required" if ARGV.empty?
     input = ARGV.shift
     manager = DCL_WC_METADATA_API::Manager.new(global_opts)
     manager.read(input)
-    
+
   # Create API operation
   when "create"
     Clop::die "Filename of MARCXML record(s) required" if ARGV.empty?
@@ -85,11 +85,10 @@ cmd_opts = case cmd
     Clop::die "No well-formed MARCXML records found as input" if count == 0
     manager = DCL_WC_METADATA_API::Manager.new(global_opts)
     manager.create(input)
-    
+
   # Any other command
   else
     Clop::die "Unknown subcommand #{cmd.inspect}. Select one of: " + \
     SUB_COMMANDS.join(", ")
-    
-  end
 
+  end

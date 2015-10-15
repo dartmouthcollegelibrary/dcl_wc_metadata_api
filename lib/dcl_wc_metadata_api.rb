@@ -1,11 +1,11 @@
 # Copyright 2015 Trustees of Dartmouth College
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -26,7 +26,7 @@ require 'yaml'
 
 module WC_METADATA_API
   class Client
-  
+
     def is_success?
       begin
         @LastResponseCode.code.start_with?("2") # 200, 201, 207
@@ -34,11 +34,11 @@ module WC_METADATA_API
         return false
       end
     end
-    
+
   end
 end
 
-# New module introduces a Manager class to iterate through the provided 
+# New module introduces a Manager class to iterate through the provided
 # input, calling WC_METADATA_API::Client and recording response and status
 # information for each record or record number. Also defines new methods
 # for setting and loading API credentials at config/credentials.yml.
@@ -47,7 +47,7 @@ module DCL_WC_METADATA_API
 
   C_DIR = File.expand_path("../../config", __FILE__)
   C_FILE = C_DIR + "/credentials.yml"
-  
+
   # Load credentials
   def DCL_WC_METADATA_API.load_credentials
     if File.exists?(C_FILE)
@@ -57,7 +57,7 @@ module DCL_WC_METADATA_API
       {}
     end
   end
-  
+
   # Check for presence of all required credentials
   def DCL_WC_METADATA_API.validate_credentials
     credentials = load_credentials
@@ -72,7 +72,7 @@ module DCL_WC_METADATA_API
         " using the config command"
     end
   end
-  
+
   # Display credentials
   def DCL_WC_METADATA_API.display_credentials
     credentials = load_credentials
@@ -82,11 +82,11 @@ module DCL_WC_METADATA_API
       credentials.each { |key, value| puts "#{key}: #{value}\n" }
     end
   end
-  
+
   # Set or update credentials
   def DCL_WC_METADATA_API.set_credentials(input)
     Dir.mkdir(C_DIR) if !Dir.exist?(C_DIR) # Create /config if it doesn't exist
-    
+
     new = {}
     strings = input.select { |s| s.include?("=") } # Basic data validation
     Clop::die "No <name>=<value> pairs found in input" if strings.length == 0
@@ -94,7 +94,7 @@ module DCL_WC_METADATA_API
       pair = string.split("=", 2) # Limit because secrets may include "="
       new[pair[0]] = pair[1]
     end
-    
+
     # Combine user input with any existing credentials and write to file
     current = load_credentials
     combined = !current.empty? ? current.merge(new) : new
@@ -104,20 +104,20 @@ module DCL_WC_METADATA_API
     output.close
     puts "Credentials set."
   end
-  
+
   class Manager
-  
+
     attr_reader :global_opts
     attr_accessor :credentials, :client, :cmd
     attr_accessor :debug_info, :response_status, :response_data
     attr_accessor :successes, :failures
-    
+
     XMLNS_MARC = "http://www.loc.gov/MARC21/slim"
     RECORD_XPATH = "//marc:record"
     ID_XPATH = "marc:datafield[@tag='035']/marc:subfield[@code='a']"
     WC_URL_XPATH = "//xmlns:id" # In returned Atom XML wrapper
     PAST_TENSE = { "read" => "read", "create" => "created" }
-    
+
     # Set up API client
     def initialize(options={})
       @global_opts = options # Provided via command line
@@ -137,13 +137,13 @@ module DCL_WC_METADATA_API
       @successes = 0
       @failures = 0
     end
-    
+
     # Write to output file
     def log_output()
       prefix = @global_opts[:prefix] ? (@global_opts[:prefix] + "-") : ""
       any_records = (@successes > 0 ? true : false) # Check for any successes
       t = Time.now.strftime("%Y%m%d%H%M%S")
-      
+
       # Data
       if any_records
         d_filename = prefix + "wc-" + @cmd + "-" + t + ".xml"
@@ -151,21 +151,21 @@ module DCL_WC_METADATA_API
         d.write(@response_data)
         d.close
       end
-      
+
       # Status log
       s_filename = prefix + "wc-" + @cmd + "-" + t + "-log.txt"
       s = File.new(s_filename, "w+:UTF-8")
       s.write(@debug_info) if @global_opts[:debug]
       s.write(@response_status)
       s.close
-      
+
       puts "OCLC WorldCat Metadata API: " + @cmd.capitalize + " operation"
       puts PAST_TENSE[@cmd].capitalize + " " + @successes.to_s +
         (@successes != 1 ? " records, " : " record, ") + @failures.to_s + " failed"
       puts "Records written to " + d_filename if any_records
       puts "Log written to " + s_filename
     end
-    
+
     # Handle success or failure for each API call
     def manage_record_result(id, result)
       if @client.is_success?
@@ -182,7 +182,7 @@ module DCL_WC_METADATA_API
         @failures += 1
       end
     end
-    
+
     def manage_holding_result(id, result)
       if @client.is_success?
         @response_status << id + ": holding set\n"
@@ -195,12 +195,12 @@ module DCL_WC_METADATA_API
         #@failures += 1
       end
     end
-    
+
     # Read API operation
     def read(input)
       @cmd = "read"
       numbers = []
-      
+
       # Extract digit strings from file or command-line input
       if File.exists?(input)
         File.open(input, "r").each { |line|
@@ -210,7 +210,7 @@ module DCL_WC_METADATA_API
         input.scan(/[\d]+/) { |match| numbers << match }
         Clop::die "No record numbers found in input" if numbers.length == 0
       end
-      
+
       # Retrieve records
       numbers.each do |number|
         begin
@@ -228,16 +228,16 @@ module DCL_WC_METADATA_API
           manage_record_result(number, rc)
         end
       end
-      
+
       log_output
     end
-    
+
     # Create API operation
     def create(input)
       @cmd = "create"
       records = {}
       numbers = []
-      
+
       # Extract records into hash
       set = input.xpath(RECORD_XPATH, "marc" => XMLNS_MARC)
       set.each do |record|
@@ -248,7 +248,7 @@ module DCL_WC_METADATA_API
         end
         records[id] = record
       end
-      
+
       # Submit records
       records.each_pair do |id, record|
         begin
@@ -271,16 +271,16 @@ module DCL_WC_METADATA_API
           manage_record_result(id, rc)
         end
       end
-      
+
       # Call holdings operation
       set_holdings(numbers)
-      
+
       log_output
     end
-    
+
     # Set holdings API operation
     def set_holdings(input)
-    
+
       input.each do |number|
         begin
           hr = client.WorldCatAddHoldings(
@@ -297,9 +297,8 @@ module DCL_WC_METADATA_API
           manage_holding_result(number, hrc)
         end
       end
-      
+
     end
-    
+
   end
 end
-
