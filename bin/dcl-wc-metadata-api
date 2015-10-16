@@ -29,6 +29,7 @@ Usage:
 Commands include:
   read    Download record(s) from OCLC
   create  Upload new record(s) to OCLC and set holding(s)
+  update  Upload modified record(s) to OCLC
   config  Set or display WSKey credentials and API preferences
 
 Before any other commands, config must be used to set the following fields:\
@@ -40,8 +41,8 @@ For definitions, see\
 
 For read, <input> is one or more record numbers (separated only by a comma) or\
  the path of a file containing a list of record numbers, one per line. For\
- create, <input> is the path of a valid MARCXML file containing one or more\
- records.
+ create or update, <input> is the path of a valid MARCXML file containing one\
+ or more records.
 
 Options include:
 EOS
@@ -85,6 +86,17 @@ cmd_opts = case cmd
     Clop::die "No well-formed MARCXML records found as input" if count == 0
     manager = DCL_WC_METADATA_API::Manager.new(global_opts)
     manager.create(input)
+
+  # Update API operation
+  when "update"
+    Clop::die "Filename of MARCXML record(s) required" if ARGV.empty?
+    input = Nokogiri::XML(File.read(ARGV.shift))
+    count = input.xpath("count(//marc:record)",
+      "marc" => "http://www.loc.gov/MARC21/slim"
+    )
+    Clop::die "No well-formed MARCXML records found as input" if count == 0
+    manager = DCL_WC_METADATA_API::Manager.new(global_opts)
+    manager.update(input)
 
   # Any other command
   else

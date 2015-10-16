@@ -1,3 +1,7 @@
 *.gem
 config/credentials.yml
+TODO
 
+# Data files
+*.xml
+*.txt

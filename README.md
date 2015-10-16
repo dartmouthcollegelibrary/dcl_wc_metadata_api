@@ -4,7 +4,7 @@ Command-line Ruby executable for the Bibliographic Resource component of the [Wo
 
 Built upon Terry Reese's [wc-metadata-api](https://github.com/reeset/wc_metadata_api/) and OCLC's [oclc-auth-ruby](https://github.com/OCLC-Developer-Network/oclc-auth-ruby). Bundled with copies of those libraries, distributed under the Apache 2.0 license.
 
-Suggestions, comments, or questions? Contact Shaun Akhtar at shaun.y.akhtar@dartmouth.edu.
+Suggestions, comments, or questions? Contact Shaun Akhtar at <shaun.y.akhtar@dartmouth.edu>.
 
 ## Usage
 
@@ -15,11 +15,12 @@ Commands include:
 
 * `read`: Download record(s) from OCLC
 * `create`: Upload new record(s) to OCLC and set holding(s)
+* `update`: Upload modified record(s) to OCLC
 * `config`: Set or display WSKey credentials and API preferences
 
 For read, `<input>` is one or more OCLC numbers (separated only by a comma) or the path of a file containing a list of OCLC numbers, one per line.
 
-For create, `<input>` is the path of a valid MARCXML file containing one or more records.
+For create or update, `<input>` is the path of a valid MARCXML file containing one or more records.
 
 All records downloaded by a command are saved to a single file in the current working directory.
 
@@ -160,4 +161,3 @@ $ dcl-wc-metadata-api config key=my-key secret=my-secret principalID=my-id princ
 ```
 
 Credentials are currently stored at /config/credentials.yml in the gem's installation directory.
-

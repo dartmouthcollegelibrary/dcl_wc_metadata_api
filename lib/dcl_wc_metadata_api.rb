@@ -114,9 +114,11 @@ module DCL_WC_METADATA_API
 
     XMLNS_MARC = "http://www.loc.gov/MARC21/slim"
     RECORD_XPATH = "//marc:record"
+    OCLC_NUM_XPATH = "marc:controlfield[@tag='001']"
     ID_XPATH = "marc:datafield[@tag='035']/marc:subfield[@code='a']"
     WC_URL_XPATH = "//xmlns:id" # In returned Atom XML wrapper
-    PAST_TENSE = { "read" => "read", "create" => "created" }
+    PAST_TENSE = { "read" => "read", "create" => "created",
+      "update" => "updated" }
 
     # Set up API client
     def initialize(options={})
@@ -274,6 +276,47 @@ module DCL_WC_METADATA_API
 
       # Call holdings operation
       set_holdings(numbers)
+
+      log_output
+    end
+
+    # Update API operation
+    def update(input)
+      @cmd = "update"
+      records = {}
+      numbers = []
+
+      # Extract records into hash
+      set = input.xpath(RECORD_XPATH, "marc" => XMLNS_MARC)
+      set.each do |record|
+        id = record.at_xpath(OCLC_NUM_XPATH, "marc" => XMLNS_MARC).text.slice(/[\d]+/) # Use OCLC number as ID
+        records[id] = record
+      end
+
+      # Submit records
+      records.each_pair do |id, record|
+        begin
+          if record.namespace_definitions.length == 0
+            record["xmlns:marc"] = XMLNS_MARC
+          end
+          record_id = record.at_xpath(OCLC_NUM_XPATH, "marc" => XMLNS_MARC)
+          record_id.content = id # Strip prefix from 001
+          r = @client.WorldCatUpdateBibRecord(
+            :holdingLibraryCode => @credentials["holdingLibraryCode"],
+            :schema => @credentials["schema"],
+            :instSymbol => @credentials["instSymbol"],
+            :xRecord => record.to_s
+          )
+          rc = Nokogiri::XML::Document.parse(@client.LastResponseCode.body)
+          number = rc.at_xpath(WC_URL_XPATH)
+          numbers << number.to_s.slice(/[\d]+/)
+        rescue NoMethodError, TypeError, URI::Error => e
+          @response_status << e.message + "\n"
+        ensure
+          @debug_info << @client.debug_info.to_s + "\n\n" + record.to_s + "\n\n"
+          manage_record_result(id, rc)
+        end
+      end
 
       log_output
     end
