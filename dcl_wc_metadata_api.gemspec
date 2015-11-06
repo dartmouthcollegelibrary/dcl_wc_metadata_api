@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
    s.name = 'dcl_wc_metadata_api'
-   s.version = '0.2.0'
+   s.version = '0.2.1'
    s.author = ['Shaun Akhtar']
    s.email = ['shaun.y.akhtar@dartmouth.edu']
    s.summary = 'DCL-local WorldCat Metadata API tools'

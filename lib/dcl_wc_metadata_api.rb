@@ -323,8 +323,9 @@ module DCL_WC_METADATA_API
 
     # Set holdings API operation
     def set_holdings(input)
+      numbers = input.compact # Remove any nil values from create/update errors
 
-      input.each do |number|
+      numbers.each do |number|
         begin
           hr = client.WorldCatAddHoldings(
             :oclcNumber => number,
