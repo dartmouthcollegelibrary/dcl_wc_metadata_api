@@ -1,6 +1,6 @@
 # dcl_wc_metadata_api
 
-Command-line Ruby executable for the Bibliographic Resource component of the [WorldCat Metadata API](http://www.oclc.org/developer/develop/web-services/worldcat-metadata-api.en.html). Intended to support batch creation and download of records in MARCXML. Developed for and in production use at the Dartmouth College Library.
+Command-line Ruby executable for the Bibliographic Resource and Holdings Resource components of the [WorldCat Metadata API](http://www.oclc.org/developer/develop/web-services/worldcat-metadata-api.en.html). Intended to support batch creation, updating, and download of records in MARCXML. Developed for and in production use at the Dartmouth College Library.
 
 Built upon Terry Reese's [wc-metadata-api](https://github.com/reeset/wc_metadata_api/) and OCLC's [oclc-auth-ruby](https://github.com/OCLC-Developer-Network/oclc-auth-ruby). Bundled with copies of those libraries, distributed under the Apache 2.0 license.
 
@@ -8,8 +8,10 @@ Suggestions, comments, or questions? Contact Shaun Akhtar at <shaun.y.akhtar@dar
 
 ## Usage
 
-  dcl-wc-metadata-api [options] <command> <input>
-  dcl-wc-metadata-api config [<name>=<value> ...]
+```
+dcl-wc-metadata-api [options] <command> <input>
+dcl-wc-metadata-api config [<name>=<value> ...]
+```
 
 Commands include:
 
@@ -133,7 +135,7 @@ RESULT(S)
 
 ## Installation
 
-Requires Ruby 2.0.0 or greater. Known to run on Linux. Windows support is forthcoming.
+Requires Ruby 2.0.0 or greater. Developed on Ruby 2.0.0p576. Known to run on Linux. Windows support is forthcoming.
 
 ```
 $ git clone https://github.com/akhtars/dcl_wc_metadata_api.git
@@ -161,3 +163,9 @@ $ dcl-wc-metadata-api config key=my-key secret=my-secret principalID=my-id princ
 ```
 
 Credentials are currently stored at /config/credentials.yml in the gem's installation directory.
+
+## License
+
+Copyright 2015 Trustees of Dartmouth College
+
+Made available under the Apache License, version 2.0. For details, see [LICENSE](https://github.com/akhtars/dcl_wc_metadata_api/blob/master/LICENSE).

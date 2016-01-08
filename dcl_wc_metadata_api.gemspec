@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
    s.name = 'dcl_wc_metadata_api'
-   s.version = '0.2.1'
+   s.version = '0.2.2'
    s.author = ['Shaun Akhtar']
    s.email = ['shaun.y.akhtar@dartmouth.edu']
    s.summary = 'DCL-local WorldCat Metadata API tools'
@@ -11,7 +11,7 @@ Gem::Specification.new do |s|
    s.add_dependency 'nokogiri', '~> 1.6', '>=1.6.3'
    s.add_dependency 'rest-client', '~> 1.6', '>= 1.6.7'
    s.has_rdoc = false
-   s.date = '2015-10-16'
+   s.date = '2016-01-08'
    s.license = 'Apache 2'
    s.description = "Dartmouth College Library scripts using Terry Reese's wc_metadata_api and OCLC's oclc-auth-ruby gems."
 end
