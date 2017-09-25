@@ -64,6 +64,15 @@ module OCLC
             @principal_id = token_data["principalID"]
             @principal_idns = token_data["principalIDNS"]
             @expires_at = DateTime.parse(token_data["expires_at"])
+          else
+            token_data = JSON.parse(@response_body)
+            if token_data['message']
+              raise OCLC::Auth::Exception, token_data['message']
+            elsif token_data['error']['errorMessage']
+              raise OCLC::Auth::Exception, token_data['error']['errorMessage']
+            else
+              raise OCLC::Auth::Exception, @response_body
+            end  
           end
         end
       end

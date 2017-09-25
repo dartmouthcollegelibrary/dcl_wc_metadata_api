@@ -32,20 +32,26 @@ module OCLC
       # Construct the authorization code object to determine your login URL.
       #
       # [client_id] the WSKey key
-      # [authenticating_institution_id] the WorldCat Registry ID of the institution that will login the user
-      # [context_institution_id] the WorldCat Registry ID of the institution whose data will be accessed
       # [redirect_uri] the redirect URI associated with the WSKey that will 'catch' the redirect back to your app after login 
       # [scope] a space separated list of the OCLC web services the client is requesting access to
-      # 
+      #
+      # Options
+      # [:authenticating_institution_id] the WorldCat Registry ID of the institution that will login the user
+      # [:context_institution_id] the WorldCat Registry ID of the institution whose data will be accessed           
       # Example:
       #
-      #   auth_code = OCLC::Auth::AuthCode.new('asdf', 128807, 128807, 'http://localhost:4567/catch_auth_code', 'WMS_Availability')
+      #   auth_code = OCLC::Auth::AuthCode.new('asdf', 'http://localhost:4567/catch_auth_code', 'WMS_Availability', [128807, 128807])
       #   redirect auth_code.login_url
       #
-      def initialize(client_id, authenticating_institution_id, context_institution_id, redirect_uri, scope)
+      def initialize(client_id, redirect_uri, scope, options = {})
+        
         self.client_id = client_id
-        self.authenticating_institution_id = authenticating_institution_id
-        self.context_institution_id = context_institution_id
+        if options[:authenticating_institution_id] 
+          self.authenticating_institution_id = options[:authenticating_institution_id] 
+        end
+        if options[:context_institution_id]
+          self.context_institution_id = options[:context_institution_id]
+        end
         self.redirect_uri = redirect_uri
         self.scope = scope
       end
@@ -65,12 +71,16 @@ module OCLC
       def querystring
         params = {
           "client_id" => client_id,
-          "authenticatingInstitutionId" => authenticating_institution_id.to_s, 
-          "contextInstitutionId" => context_institution_id.to_s, 
           "redirect_uri" => redirect_uri, 
           "response_type" => 'code',
           "scope" => scope
-        }        
+        }
+        if authenticating_institution_id
+          params["authenticatingInstitutionId"] = authenticating_institution_id.to_s 
+        end
+        if context_institution_id
+          params["contextInstitutionId"] = context_institution_id.to_s 
+        end 
         params.map { |name,value| "#{CGI.escape name}=#{CGI.escape value}" }.sort.join("&")
       end
       

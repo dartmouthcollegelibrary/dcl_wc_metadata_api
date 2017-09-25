@@ -29,7 +29,7 @@ module OCLC
     # See the OCLC::Auth documentation for examples.
     class WSKey
     
-      attr_reader :key, :secret, :redirect_uri, :services
+      attr_reader :key, :secret, :redirect_uri, :services, :auth_server_url
       attr_accessor :debug_mode, :debug_timestamp, :debug_nonce 
     
       # Construct a new Web Service key for use when authenticating to OCLC Web Services.
@@ -42,6 +42,7 @@ module OCLC
       # 
       # [:redirect_uri] the redirect URI associated with the WSKey that will 'catch' the redirect back to your app after login 
       # [:services] an array of one or more OCLC web services, examples: WorldCatMetadataAPI, WMS_NCIP
+      # [:auth_server_url] url for the Authorization server to use (optional: default set to https://authn.sd00.worldcat.org/oauth2)
       def initialize(key, secret, options = {})
         @key = key
         @secret = secret
@@ -51,17 +52,34 @@ module OCLC
         if options[:services]
           @services = options[:services] 
         end
+        if options[:auth_server_url]
+          @auth_server_url = options[:auth_server_url]
+        end
       end
       
       # Returns the login URL used with OCLC's OAuth 2 implementation of the  Explicit Authorization Flow.
       #
+      # Options
+      # 
+      # [:authenticating_institution_id] the WorldCat Registry ID of the institution that will login the user
+      # [:context_institution_id] the WorldCat Registry ID of the institution whose data will be accessed
+      #      
       # See {Explicit Auth Documentation}[http://www.oclc.org/developer/platform/explicit-authorization-code] on the 
       # OCLC Developer Network.
-      def login_url(authenticating_institution_id, context_institution_id)
+      def login_url(authenticating_institution_id = nil, context_institution_id = nil)
         if services == nil or services.size == 0
           raise OCLC::Auth::Exception, "No service specified. You must construct a WSKey with one or more services to request an auth code" 
         end
-        auth_code = OCLC::Auth::AuthCode.new(@key, authenticating_institution_id, context_institution_id, @redirect_uri, services.join(' '))
+        
+        if authenticating_institution_id and context_institution_id
+          auth_code = OCLC::Auth::AuthCode.new(@key, @redirect_uri, services.join(' '), :authenticating_institution_id => authenticating_institution_id, :context_institution_id => context_institution_id)
+        else
+          auth_code = OCLC::Auth::AuthCode.new(@key, @redirect_uri, services.join(' '))
+        end
+        
+        if @auth_server_url
+          auth_code.auth_server_url = @auth_server_url + '/authorizeCode'
+        end
         auth_code.login_url
       end
       
@@ -74,6 +92,9 @@ module OCLC
       def auth_code_token(auth_code, authenticating_institution_id, context_institution_id)
         options = {:redirect_uri => redirect_uri, :code => auth_code}
         token = OCLC::Auth::AccessToken.new('authorization_code', services.join(' '), authenticating_institution_id, context_institution_id, options)
+        if @auth_server_url
+         token.auth_server_url = @auth_server_url + '/accessToken'
+        end
         token.create!(self)
         token
       end
@@ -94,6 +115,9 @@ module OCLC
           raise OCLC::Auth::Exception, "No service specified. You must construct a WSKey with one or more services to request an access token code" 
         end
         token = OCLC::Auth::AccessToken.new('client_credentials', services.join(' '), authenticating_institution_id, context_institution_id)
+        if @auth_server_url
+          token.auth_server_url = @auth_server_url + '/accessToken'
+        end
         token.create!(self, options)
         token
       end
@@ -176,7 +200,7 @@ module OCLC
       end
     
       def signature( base_string )
-        digest = OpenSSL::Digest::Digest.new( 'sha256' )
+        digest = OpenSSL::Digest.new( 'sha256' )
         hmac = OpenSSL::HMAC.digest( digest, @secret, base_string  )
         Base64.encode64( hmac ).chomp.gsub( /\n/, '' )
       end
