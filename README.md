@@ -1,6 +1,6 @@
 # dcl_wc_metadata_api
 
-Command-line Ruby executable for the Bibliographic Resource and Holdings Resource components of the [WorldCat Metadata API](http://www.oclc.org/developer/develop/web-services/worldcat-metadata-api.en.html). Intended to support batch creation, updating, and download of records in MARCXML. Developed for and in production use at the Dartmouth College Library.
+Command-line Ruby executable for the Bibliographic Resource and Holdings Resource components of the [WorldCat Metadata API](http://www.oclc.org/developer/develop/web-services/worldcat-metadata-api.en.html). Intended to support batch creation, updating, validation, and download of records in MARCXML. Developed for and in production use at the Dartmouth College Library.
 
 Built upon Terry Reese's [wc-metadata-api](https://github.com/reeset/wc_metadata_api/) and OCLC's [oclc-auth-ruby](https://github.com/OCLC-Developer-Network/oclc-auth-ruby). Bundled with copies of those libraries, distributed under the Apache 2.0 license.
 
@@ -18,11 +18,12 @@ Commands include:
 * `read`: Download record(s) from OCLC
 * `create`: Upload new record(s) to OCLC and set holding(s)
 * `update`: Upload modified record(s) to OCLC
+* `validate`: Perform full OCLC validation (e.g. before create or update)
 * `config`: Set or display WSKey credentials and API preferences
 
 For read, `<input>` is one or more OCLC numbers (separated only by a comma) or the path of a file containing a list of OCLC numbers, one per line.
 
-For create or update, `<input>` is the path of a valid MARCXML file containing one or more records.
+For create, update, or validate, `<input>` is the path of a valid MARCXML file containing one or more records.
 
 All records downloaded by a command are saved to a single file in the current working directory.
 
@@ -133,12 +134,68 @@ RESULT(S)
 915392573: holding set
 ```
 
-## Installation
+### Validate batch of MARCXML records
 
-Requires Ruby 2.0.0 or greater. Developed on Ruby 2.0.0p576. Known to run on Linux. Windows support is forthcoming.
+```xml
+# marc-batch-2018062514413340.xml
+
+<?xml version="1.0" encoding="UTF-8"?>
+<marc:collection xmlns:marc="http://www.loc.gov/MARC21/slim">
+   <marc:record>
+      <marc:leader>     nem  22     Ka 4500</marc:leader>
+...
+```
 
 ```
-$ git clone https://github.com/akhtars/dcl_wc_metadata_api.git
+$ dcl-wc-metadata-api validate marc-batch-2018062514413340.xml
+
+OCLC WorldCat Metadata API: Validate operation
+Validated 164 records, 14 failed
+Records written to wc-validate-20181002114734.xml
+Log written to wc-validate-20181002114734-log.txt
+```
+
+```xml
+# wc-validate-20181002114734.xml
+
+<?xml version="1.0"?>
+<collection xmlns="http://www.loc.gov/MARC21/slim">
+  <record>
+        <leader>00000nem a2200000Ka 4500</leader>
+...
+```
+
+```
+# wc-validate-20181002114734-log.txt
+
+RESULT(S)
+
+(DRB)Burnt_Mountain_1993: validated
+(DRB)Connecticut_River_1828: validated
+(DRB)DOC_Trails_1990: failed
+<?xml version="1.0" encoding="UTF-8"?>
+<entry xmlns="http://www.w3.org/2005/Atom" xmlns:oclc="http://worldcat.org/xmlschemas/response">
+...
+<oclc:error>
+  <oclc:code type="application">CAT-VALIDATION</oclc:code>
+  <oclc:message>Record is invalid</oclc:message>
+  <oclc:detail type="application/xml">
+    <validationErrors xmlns="">
+      <validationError type="variable field">
+        <field occurrence="2" name="043"/>
+        <message>043 occurs too many times.</message>
+      </validationError>
+    </validationErrors>
+  </oclc:detail>
+</oclc:error>
+```
+
+## Installation
+
+Requires Ruby 2.0.0 or greater. Developed on Ruby 2.0.0p576 and Ruby 2.4.3p205.
+
+```
+$ git clone https://github.com/dartmouthcollegelibrary/dcl_wc_metadata_api.git
 $ cd dcl_wc_metadata_api
 $ gem build dcl_wc_metadata_api.gemspec
 $ gem install dcl_wc_metadata_api-<VERSION-NUMBER>.gem

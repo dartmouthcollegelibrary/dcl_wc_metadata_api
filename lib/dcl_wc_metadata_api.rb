@@ -118,7 +118,7 @@ module DCL_WC_METADATA_API
     ID_XPATH = "marc:datafield[@tag='035']/marc:subfield[@code='a']"
     WC_URL_XPATH = "//xmlns:id" # In returned Atom XML wrapper
     PAST_TENSE = { "read" => "read", "create" => "created",
-      "update" => "updated" }
+      "update" => "updated", "validate" => "validated" }
 
     # Set up API client
     def initialize(options={})
@@ -132,7 +132,7 @@ module DCL_WC_METADATA_API
         :debug => false
       )
       @debug_info = "CLIENT REQUEST(S)"
-      @response_status = "RESULT(S)\n\n"
+      @response_status = "\nRESULT(S)\n\n"
       @response_data = Nokogiri::XML::Document.parse(
         "<collection xmlns=\"http://www.loc.gov/MARC21/slim\">"
       )
@@ -148,24 +148,37 @@ module DCL_WC_METADATA_API
 
       # Data
       if any_records
-        d_filename = prefix + "wc-" + @cmd + "-" + t + ".xml"
-        d = File.new(d_filename, "w+:UTF-8")
-        d.write(@response_data)
-        d.close
+        data_filename = prefix + "wc-" + @cmd + "-" + t + ".xml"
+        data = File.new(data_filename, "w+:UTF-8")
+        data.write(@response_data)
+        data.close
       end
 
-      # Status log
-      s_filename = prefix + "wc-" + @cmd + "-" + t + "-log.txt"
-      s = File.new(s_filename, "w+:UTF-8")
-      s.write(@debug_info) if @global_opts[:debug]
-      s.write(@response_status)
-      s.close
+      status_filename = prefix + "wc-" + @cmd + "-" + t + "-log.txt"
 
-      puts "OCLC WorldCat Metadata API: " + @cmd.capitalize + " operation"
-      puts PAST_TENSE[@cmd].capitalize + " " + @successes.to_s +
-        (@successes != 1 ? " records, " : " record, ") + @failures.to_s + " failed"
-      puts "Records written to " + d_filename if any_records
-      puts "Log written to " + s_filename
+      # Summary
+      summary = ""
+      summary << <<~SUMMARY
+      OCLC WorldCat Metadata API: #{@cmd.capitalize} operation
+      #{PAST_TENSE[@cmd].capitalize} #{@successes.to_s} #{@successes != 1 ? "records," : "record,"} #{@failures.to_s} failed
+      Records written to #{data_filename if any_records}
+      Log written to #{status_filename}
+      SUMMARY
+
+      # Status log
+      status = File.new(status_filename, "w+:UTF-8")
+      status.write(@debug_info) if @global_opts[:debug]
+      status.write(summary)
+      status.write(@response_status)
+      status.close
+
+      puts summary
+
+      # puts "OCLC WorldCat Metadata API: " + @cmd.capitalize + " operation"
+      # puts PAST_TENSE[@cmd].capitalize + " " + @successes.to_s +
+      #   (@successes != 1 ? " records, " : " record, ") + @failures.to_s + " failed"
+      # puts "Records written to " + data_filename if any_records
+      # puts "Log written to " + status_filename
     end
 
     # Handle success or failure for each API call
@@ -310,6 +323,43 @@ module DCL_WC_METADATA_API
           rc = Nokogiri::XML::Document.parse(@client.LastResponseCode.body)
           number = rc.at_xpath(WC_URL_XPATH)
           numbers << number.to_s.slice(/[\d]+/)
+        rescue NoMethodError, TypeError, URI::Error => e
+          @response_status << e.message + "\n"
+        ensure
+          @debug_info << @client.debug_info.to_s + "\n\n" + record.to_s + "\n\n"
+          manage_record_result(id, rc)
+        end
+      end
+
+      log_output
+    end
+
+    # Validate API operation
+    def validate(input)
+      @cmd = "validate"
+      records = {}
+
+      # Extract records into hash
+      set = input.xpath(RECORD_XPATH, "marc" => XMLNS_MARC)
+      set.each do |record|
+        if record.at_xpath(ID_XPATH, "marc" => XMLNS_MARC).nil?
+          id = set.index(record).to_s # Use record's index as backup ID
+        else
+          id = record.at_xpath(ID_XPATH, "marc" => XMLNS_MARC).text
+        end
+        records[id] = record
+      end
+
+      # Submit records
+      records.each_pair do |id, record|
+        begin
+          if record.namespace_definitions.length == 0
+            record["xmlns:marc"] = XMLNS_MARC
+          end
+          r = @client.WorldCatValidateFull(
+            :xRecord => record.to_s
+          )
+          rc = Nokogiri::XML::Document.parse(@client.LastResponseCode.body)
         rescue NoMethodError, TypeError, URI::Error => e
           @response_status << e.message + "\n"
         ensure
