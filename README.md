@@ -18,10 +18,11 @@ Commands include:
 * `read`: Download record(s) from OCLC
 * `create`: Upload new record(s) to OCLC and set holding(s)
 * `update`: Upload modified record(s) to OCLC
+* `set`: Set OCLC holdings
 * `validate`: Perform full OCLC validation (e.g. before create or update)
 * `config`: Set or display WSKey credentials and API preferences
 
-For read, `<input>` is one or more OCLC numbers (separated only by a comma) or the path of a file containing a list of OCLC numbers, one per line.
+For read or set, `<input>` is one or more OCLC numbers (separated only by a comma) or the path of a file containing a list of OCLC numbers, one per line.
 
 For create, update, or validate, `<input>` is the path of a valid MARCXML file containing one or more records.
 
@@ -134,6 +135,50 @@ RESULT(S)
 915392573: holding set
 ```
 
+### Set holdings from text file containing OCLC numbers
+
+```
+# numbers.txt
+
+12561
+97196
+108489
+181693
+234613
+```
+
+```
+$ dcl-wc-metadata-api -v set numbers.txt
+
+12561: holding set
+97196: set holding failed
+108489: holding set
+181693: holding set
+234613: holding set
+OCLC WorldCat Metadata API: Set operation
+Set 4 records, 1 failed
+
+Log written to wc-set-20220105151005-log.txt
+
+```
+
+```xml
+# wc-set-20220105151005-log.txt
+
+RESULT(S)
+
+12561: holding set
+97196: set holding failed
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<error xmlns="http://worldcat.org/xmlschemas/response">
+    <code type="application">WS-409</code>
+    <message>Trying to set hold while holding already exists</message>
+</error>
+108489: holding set
+181693: holding set
+234613: holding set
+```
+
 ### Validate batch of MARCXML records
 
 ```xml
@@ -192,7 +237,7 @@ RESULT(S)
 
 ## Installation
 
-Requires Ruby 2.0.0 or greater. Developed on Ruby 2.0.0p576 and Ruby 2.4.3p205.
+Requires Ruby 2.0.0 or greater. Developed on Ruby 2.0.0p576, Ruby 2.4.3p205, and Ruby 2.7.5p203.
 
 ```
 $ git clone https://github.com/dartmouthcollegelibrary/dcl_wc_metadata_api.git
