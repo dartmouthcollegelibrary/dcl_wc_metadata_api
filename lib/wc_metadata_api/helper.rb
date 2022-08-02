@@ -32,8 +32,13 @@ module WC_METADATA_API
 	   uri = URI.parse(opts[:url])
            request = Net::HTTP::Get.new(uri.request_uri)
 	   request['Authorization'] =token.hmac_signature('GET', opts[:url], :principal_id => @principalID, :principal_idns => @principalDNS)
- 	   request['Accept'] = 'application/atom+xml;content="application/vnd.oclc.marc21+xml"' # Modified to specify MARCXML
-	   request['Content-Type'] = 'application/atom+xml'
+ 	   # Modified to allow customization, e.g. for check operation that requires JSON
+       if opts[:accept]
+           request['Accept'] = opts[:accept]
+       else
+           request['Accept'] = 'application/atom+xml;content="application/vnd.oclc.marc21+xml"' # Modified to specify MARCXML
+    	   request['Content-Type'] = 'application/atom+xml'
+       end
 	   http = Net::HTTP.new(uri.host, uri.port)
 	   http.use_ssl = true
 	   response = http.start do |http|

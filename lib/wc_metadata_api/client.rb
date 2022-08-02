@@ -25,6 +25,9 @@ module WC_METADATA_API
      WORLDCAT_METADATA_VALIDATE_FULL_URI = "https://worldcat.org/bib/validateFull"
      WORLDCAT_METADATA_VALIDATE_ADD_URI = "https://worldcat.org/bib/validateAdd"
      WORLDCAT_METADATA_VALIDATE_REPLACE_URI = "https://worldcat.org/bib/validateReplace"
+     
+     # Modified to add base URI for check control numbers operation
+     WORLDCAT_METADATA_CHECK_CONTROL_NUMBERS_URI = "https://worldcat.org/bib/checkcontrolnumbers"
 
      attr_accessor :LastResponseCode
      attr_accessor :debug_info # Modified to store debug string
@@ -109,7 +112,7 @@ module WC_METADATA_API
           @LastResponseCode = response
           return true
      end
-
+     
      def WorldCatRetrieveHoldingCodes(opts={})
          sRecord = ""
           @LastResponseCode = ""
@@ -201,6 +204,21 @@ module WC_METADATA_API
           @debug_info = helper.debug_string + "\n\n" + base_uri
           @LastResponseCode = response
 	        return true
+     end
+
+     # Added to support check control numbers operation
+     def WorldCatCheckControlNumbers(opts={})
+         sRecord = ""
+          @LastResponseCode = ""
+          base_uri = WORLDCAT_METADATA_CHECK_CONTROL_NUMBERS_URI
+          helper = Helper.new(:wskey => @wskey, :secret => @secret, :principalID=>@principalID, :principalDNS => @principalDNS)
+
+          base_uri += "?oclcNumbers=" + opts[:oclcNumber]
+          response = helper.MakeHTTPRequest(:url => base_uri, :method => "GET", :accept => "application/atom+json")
+          @debug_info = helper.debug_string + "\n\n" + base_uri
+          @LastResponseCode = response
+          sRecord = response
+          return sRecord
      end
 
   end

@@ -19,10 +19,11 @@ Commands include:
 * `create`: Upload new record(s) to OCLC and set holding(s)
 * `update`: Upload modified record(s) to OCLC
 * `set`: Set OCLC holdings
+* `check`: Get current OCLC number
 * `validate`: Perform full OCLC validation (e.g. before create or update)
 * `config`: Set or display WSKey credentials and API preferences
 
-For read or set, `<input>` is one or more OCLC numbers (separated only by a comma) or the path of a file containing a list of OCLC numbers, one per line.
+For read, set, or check, `<input>` is one or more OCLC numbers (separated only by a comma) or the path of a file containing a list of OCLC numbers, one per line.
 
 For create, update, or validate, `<input>` is the path of a valid MARCXML file containing one or more records.
 
@@ -177,6 +178,39 @@ RESULT(S)
 108489: holding set
 181693: holding set
 234613: holding set
+```
+
+### Check records from text file containing OCLC numbers
+
+```
+# numbers.txt
+
+1
+6567842 # Has been merged
+9000000000000 # Not (yet) a real record number
+```
+
+```
+$ dcl-wc-metadata-api -v check numbers.txt
+
+1: 1
+6567842: merged with 1
+9000000000000: number check failed (Record not found.)
+OCLC WorldCat Metadata API: Check operation
+Matched 1 record, 2 failed
+
+Log written to wc-check-20220124175659-log.txt
+```
+
+```
+# wc-check-20220124175659-log.txt
+
+RESULT(S)
+
+1: 1
+6567842: merged with 1
+9000000000000: number check failed
+{"entries"=>[{"title"=>"9000000000000", "content"=>{"requestedOclcNumber"=>"9000000000000", "currentOclcNumber"=>"9000000000000", "institution"=>"DRB", "status"=>"HTTP 404 Not Found", "detail"=>"Record not found.", "id"=>"http://worldcat.org/oclc/9000000000000", "merged"=>false, "found"=>false}, "updated"=>"2022-01-24T22:56:59.006Z"}], "extensions"=>[{"name"=>"os:totalResults", "attributes"=>{"xmlns:os"=>"http://a9.com/-/spec/opensearch/1.1/"}, "children"=>["1"]}, {"name"=>"os:startIndex", "attributes"=>{"xmlns:os"=>"http://a9.com/-/spec/opensearch/1.1/"}, "children"=>["1"]}, {"name"=>"os:itemsPerPage", "attributes"=>{"xmlns:os"=>"http://a9.com/-/spec/opensearch/1.1/"}, "children"=>["1"]}]}
 ```
 
 ### Validate batch of MARCXML records

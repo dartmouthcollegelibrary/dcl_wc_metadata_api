@@ -118,7 +118,8 @@ module DCL_WC_METADATA_API
     ID_XPATH = "marc:datafield[@tag='035']/marc:subfield[@code='a']"
     WC_URL_XPATH = "//xmlns:id" # In returned Atom XML wrapper
     PAST_TENSE = { "read" => "read", "create" => "created",
-      "update" => "updated", "set" => "set", "validate" => "validated" }
+      "update" => "updated", "set" => "set", "check" => "matched",
+      "validate" => "validated" }
 
     # Set up API client
     def initialize(options={})
@@ -146,7 +147,7 @@ module DCL_WC_METADATA_API
       t = Time.now.strftime("%Y%m%d%H%M%S")
 
       # Check for any returned records
-      if (@successes > 0 and @cmd != "set")
+      if (@successes > 0 and not ["set", "check"].include?(@cmd))
         any_records = true
       else
         any_records = false
@@ -179,12 +180,6 @@ module DCL_WC_METADATA_API
       status.close
 
       puts summary
-
-      # puts "OCLC WorldCat Metadata API: " + @cmd.capitalize + " operation"
-      # puts PAST_TENSE[@cmd].capitalize + " " + @successes.to_s +
-      #   (@successes != 1 ? " records, " : " record, ") + @failures.to_s + " failed"
-      # puts "Records written to " + data_filename if any_records
-      # puts "Log written to " + status_filename
     end
 
     # Handle success or failure for each API call
@@ -214,6 +209,34 @@ module DCL_WC_METADATA_API
         @response_status << result.to_s
         puts id + ": set holding failed" if @global_opts[:verbose]
         @failures += 1 if @cmd == "set"
+      end
+    end
+
+    def manage_check_result(id, result)
+      found = result["entries"][0]["content"]["found"]
+      merged = result["entries"][0]["content"]["merged"]
+      returnedNumber = result["entries"][0]["content"]["currentOclcNumber"]
+      detail = result["entries"][0]["content"]["detail"]
+
+      if @client.is_success? and found and returnedNumber == id
+        @response_status << id + ": #{returnedNumber}\n"
+        puts id + ": #{returnedNumber}" if @global_opts[:verbose]
+        @successes += 1 if @cmd == "check"
+      else
+        if merged
+          @response_status << id + ": merged with #{returnedNumber}\n"
+          puts id + ": merged with #{returnedNumber}" if @global_opts[:verbose]
+        else
+          if detail.nil?
+            @response_status << id + ": number check failed\n"
+            puts id + ": number check failed" if @global_opts[:verbose]
+          else
+            @response_status << id + ": number check failed (#{detail})\n"
+            puts id + ": number check failed (#{detail})" if @global_opts[:verbose]
+          end
+          @response_status << result.to_s + "\n"
+        end
+        @failures += 1 if @cmd == "check"
       end
     end
 
@@ -344,7 +367,7 @@ module DCL_WC_METADATA_API
     def set(input)
       @cmd = "set"
       numbers = []
-    
+
       # Extract digit strings from file or command-line input
       if File.exists?(input)
         File.open(input, "r").each { |line|
@@ -354,10 +377,43 @@ module DCL_WC_METADATA_API
         input.scan(/[\d]+/) { |match| numbers << match }
         Clop::die "No record numbers found in input" if numbers.length == 0
       end
-    
+
       # Set holdings
       set_holdings(numbers)
-    
+
+      log_output
+    end
+
+    # Check API operation
+    def check(input)
+      @cmd = "check"
+      numbers = []
+
+      # Extract digit strings from file or command-line input
+      if File.exists?(input)
+        File.open(input, "r").each { |line|
+          line.scan(/[\d]+/) { |match| numbers << match }
+        }
+      else
+        input.scan(/[\d]+/) { |match| numbers << match }
+        Clop::die "No record numbers found in input" if numbers.length == 0
+      end
+
+      # Check record numbers
+      numbers.each do |number|
+        begin
+          cr = client.WorldCatCheckControlNumbers(
+            :oclcNumber => number
+          )
+          crc = JSON.parse(@client.LastResponseCode.body)
+        rescue NoMethodError, TypeError, URI::Error, JSON::ParserError => e
+          @response_status << e.message + "\n"
+        ensure
+          @debug_info << @client.debug_info.to_s + "\n\n"
+          manage_check_result(number, crc)
+        end
+      end
+
       log_output
     end
 
