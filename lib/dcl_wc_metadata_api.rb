@@ -118,8 +118,8 @@ module DCL_WC_METADATA_API
     ID_XPATH = "marc:datafield[@tag='035']/marc:subfield[@code='a']"
     WC_URL_XPATH = "//xmlns:id" # In returned Atom XML wrapper
     PAST_TENSE = { "read" => "read", "create" => "created",
-      "update" => "updated", "set" => "set", "check" => "matched",
-      "validate" => "validated" }
+      "update" => "updated", "set" => "set", "unset" => "unset",
+      "check" => "matched", "validate" => "validated" }
 
     # Set up API client
     def initialize(options={})
@@ -147,7 +147,7 @@ module DCL_WC_METADATA_API
       t = Time.now.strftime("%Y%m%d%H%M%S")
 
       # Check for any returned records
-      if (@successes > 0 and not ["set", "check"].include?(@cmd))
+      if (@successes > 0 and not ["set", "unset", "check"].include?(@cmd))
         any_records = true
       else
         any_records = false
@@ -201,14 +201,14 @@ module DCL_WC_METADATA_API
 
     def manage_holding_result(id, result)
       if @client.is_success?
-        @response_status << id + ": holding set\n"
-        puts id + ": holding set" if @global_opts[:verbose]
-        @successes += 1 if @cmd == "set"
+        @response_status << id + ": holding updated\n"
+        puts id + ": holding updated" if @global_opts[:verbose]
+        @successes += 1 if ["set", "unset"].include?(@cmd)
       else
-        @response_status << id + ": set holding failed\n"
+        @response_status << id + ": update holding failed\n"
         @response_status << result.to_s
-        puts id + ": set holding failed" if @global_opts[:verbose]
-        @failures += 1 if @cmd == "set"
+        puts id + ": update holding failed" if @global_opts[:verbose]
+        @failures += 1 if ["set", "unset"].include?(@cmd)
       end
     end
 
@@ -384,6 +384,27 @@ module DCL_WC_METADATA_API
       log_output
     end
 
+    # Unset API operation
+    def unset(input)
+      @cmd = "unset"
+      numbers = []
+
+      # Extract digit strings from file or command-line input
+      if File.exists?(input)
+        File.open(input, "r").each { |line|
+          line.scan(/[\d]+/) { |match| numbers << match }
+        }
+      else
+        input.scan(/[\d]+/) { |match| numbers << match }
+        Clop::die "No record numbers found in input" if numbers.length == 0
+      end
+
+      # Set holdings
+      unset_holdings(numbers)
+
+      log_output
+    end
+
     # Check API operation
     def check(input)
       @cmd = "check"
@@ -461,6 +482,29 @@ module DCL_WC_METADATA_API
       numbers.each do |number|
         begin
           hr = client.WorldCatAddHoldings(
+            :oclcNumber => number,
+            :holdingLibraryCode => @credentials["holdingLibraryCode"],
+            :schema => @credentials["schema"],
+            :instSymbol => @credentials["instSymbol"]
+          )
+          hrc = Nokogiri::XML::Document.parse(@client.LastResponseCode.body)
+        rescue NoMethodError, TypeError, URI::Error => e
+          @response_status << e.message + "\n"
+        ensure
+          @debug_info << @client.debug_info.to_s + "\n\n"
+          manage_holding_result(number, hrc)
+        end
+      end
+
+    end
+
+    # Unset holdings API operation
+    def unset_holdings(input)
+      numbers = input.compact # Remove any nil values from create/update errors
+
+      numbers.each do |number|
+        begin
+          hr = client.WorldCatDeleteHoldings(
             :oclcNumber => number,
             :holdingLibraryCode => @credentials["holdingLibraryCode"],
             :schema => @credentials["schema"],

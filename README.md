@@ -19,11 +19,12 @@ Commands include:
 * `create`: Upload new record(s) to OCLC and set holding(s)
 * `update`: Upload modified record(s) to OCLC
 * `set`: Set OCLC holdings
+* `unset`: Unset OCLC holdings
 * `check`: Get current OCLC number
 * `validate`: Perform full OCLC validation (e.g. before create or update)
 * `config`: Set or display WSKey credentials and API preferences
 
-For read, set, or check, `<input>` is one or more OCLC numbers (separated only by a comma) or the path of a file containing a list of OCLC numbers, one per line.
+For read, set, unset, or check, `<input>` is one or more OCLC numbers (separated only by a comma) or the path of a file containing a list of OCLC numbers, one per line.
 
 For create, update, or validate, `<input>` is the path of a valid MARCXML file containing one or more records.
 
@@ -160,7 +161,6 @@ OCLC WorldCat Metadata API: Set operation
 Set 4 records, 1 failed
 
 Log written to wc-set-20220105151005-log.txt
-
 ```
 
 ```xml
@@ -178,6 +178,43 @@ RESULT(S)
 108489: holding set
 181693: holding set
 234613: holding set
+```
+
+### Unset holdings from text file containing OCLC numbers
+
+```
+# numbers.txt
+
+8077859
+8096970
+8726774
+```
+
+```
+$ dcl-wc-metadata-api -v unset numbers.txt
+
+8077859: holding updated
+8096970: holding updated
+8726774: update holding failed
+OCLC WorldCat Metadata API: Unset operation
+Unset 2 records, 1 failed
+
+Log written to wc-unset-20220802152902-log.txt
+```
+
+```xml
+# wc-unset-20220802152902-log.txt
+
+RESULT(S)
+
+8077859: holding updated
+8096970: holding updated
+8726774: update holding failed
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<error xmlns="http://worldcat.org/xmlschemas/response">
+    <code type="application">WS-409</code>
+    <message>Trying to unset hold while holding does not exist</message>
+</error>
 ```
 
 ### Check records from text file containing OCLC numbers

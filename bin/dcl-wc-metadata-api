@@ -17,7 +17,7 @@
 require_relative '../lib/dcl_wc_metadata_api'
 
 # Define command-line options and documentation
-SUB_COMMANDS = %w(read create update set check validate config)
+SUB_COMMANDS = %w(read create update set unset check validate config)
 global_opts = Clop::options do
   banner <<-EOS
 dcl-wc-metadata-api, DCL-local WorldCat Metadata API tools.
@@ -31,6 +31,7 @@ Commands include:
   create    Upload new record(s) to OCLC and set holding(s)
   update    Upload modified record(s) to OCLC
   set       Set OCLC holdings
+  unset     Unset OCLC holdings
   check     Get current OCLC number
   validate  Perform full OCLC validation (e.g. before create or update)
   config    Set or display WSKey credentials and API preferences
@@ -42,10 +43,10 @@ Before any other commands, config must be used to set the following fields:\
 For definitions, see\
  http://www.oclc.org/developer/develop/web-services/worldcat-metadata-api/bibliographic-resource.en.html.
 
-For read, set, or check, <input> is one or more record numbers (separated only\
- by a comma) or the path of a file containing a list of record numbers, one per\
- line. For create, update, or validate, <input> is the path of a valid MARCXML\
- file containing one or more records.
+For read, set, unset, or check, <input> is one or more record numbers (separated\
+ only by a comma) or the path of a file containing a list of record numbers, one\
+ per line. For create, update, or validate, <input> is the path of a valid\
+ MARCXML file containing one or more records.
 
 Options include:
 EOS
@@ -108,8 +109,15 @@ cmd_opts = case cmd
     manager = DCL_WC_METADATA_API::Manager.new(global_opts)
     manager.set(input)
 
+  # Unset API operation
+  when "unset"
+    Clop::die "OCLC record number(s) required" if ARGV.empty?
+    input = ARGV.shift
+    manager = DCL_WC_METADATA_API::Manager.new(global_opts)
+    manager.unset(input)
+
   # Check API operation
-when "check"
+  when "check"
     Clop::die "OCLC record number(s) required" if ARGV.empty?
     input = ARGV.shift
     manager = DCL_WC_METADATA_API::Manager.new(global_opts)
