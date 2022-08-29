@@ -35,6 +35,7 @@ Options include:
 * `-v, --verbose`: Print success status for each item
 * `-d, --debug`: Save request URL and body to output log
 * `-p, --prefix=<s>`: Append string to output filenames
+* `-c, --csv`: Format log as CSV
 * `-h, --help`: Show this message
 
 ## Examples
@@ -58,7 +59,7 @@ $ dcl-wc-metadata-api -v read numbers.txt
 9000000000000: failed
 908450913: read
 OCLC WorldCat Metadata API: Read operation
-Read 3 records, 1 failed
+Read 3 records and 1 failed
 Records written to wc-read-20150723112649.xml
 Log written to wc-read-20150723112649-log.txt
 ```
@@ -110,7 +111,7 @@ RESULT(S)
 $ dcl-wc-metadata-api create ~/Desktop/dcl-ruby/input/dwcposters-c078-marc.xml
 
 OCLC WorldCat Metadata API: Create operation
-Created 1 record, 0 failed
+Created 1 record and 0 failed
 Records written to wc-create-20150803155439.xml
 Log written to wc-create-20150803155439-log.txt
 ```
@@ -158,7 +159,7 @@ $ dcl-wc-metadata-api -v set numbers.txt
 181693: holding set
 234613: holding set
 OCLC WorldCat Metadata API: Set operation
-Set 4 records, 1 failed
+Set 4 records and 1 failed
 
 Log written to wc-set-20220105151005-log.txt
 ```
@@ -197,7 +198,7 @@ $ dcl-wc-metadata-api -v unset numbers.txt
 8096970: holding updated
 8726774: update holding failed
 OCLC WorldCat Metadata API: Unset operation
-Unset 2 records, 1 failed
+Unset 2 records and 1 failed
 
 Log written to wc-unset-20220802152902-log.txt
 ```
@@ -228,26 +229,24 @@ RESULT(S)
 ```
 
 ```
-$ dcl-wc-metadata-api -v check numbers.txt
+$ dcl-wc-metadata-api -c -v check numbers.txt
 
-1: 1
-6567842: merged with 1
-9000000000000: number check failed (Record not found.)
+1,1
+6567842,merged with 1
+9000000000000,number check failed ("Record not found.")
 OCLC WorldCat Metadata API: Check operation
-Matched 1 record, 2 failed
+Matched 1 record and 2 failed
 
-Log written to wc-check-20220124175659-log.txt
+Log written to wc-check-20220829154121-log.csv
 ```
 
 ```
-# wc-check-20220124175659-log.txt
+# wc-check-20220829154121-log.csv
 
-RESULT(S)
-
-1: 1
-6567842: merged with 1
-9000000000000: number check failed
-{"entries"=>[{"title"=>"9000000000000", "content"=>{"requestedOclcNumber"=>"9000000000000", "currentOclcNumber"=>"9000000000000", "institution"=>"DRB", "status"=>"HTTP 404 Not Found", "detail"=>"Record not found.", "id"=>"http://worldcat.org/oclc/9000000000000", "merged"=>false, "found"=>false}, "updated"=>"2022-01-24T22:56:59.006Z"}], "extensions"=>[{"name"=>"os:totalResults", "attributes"=>{"xmlns:os"=>"http://a9.com/-/spec/opensearch/1.1/"}, "children"=>["1"]}, {"name"=>"os:startIndex", "attributes"=>{"xmlns:os"=>"http://a9.com/-/spec/opensearch/1.1/"}, "children"=>["1"]}, {"name"=>"os:itemsPerPage", "attributes"=>{"xmlns:os"=>"http://a9.com/-/spec/opensearch/1.1/"}, "children"=>["1"]}]}
+Record Number,Status,Response
+1,1,
+6567842,merged with 1,
+9000000000000,number check failed ("Record not found."),{"entries"=>[{"title"=>"9000000000000", "content"=>{"requestedOclcNumber"=>"9000000000000", "currentOclcNumber"=>"9000000000000", "institution"=>"DRB", "status"=>"HTTP 404 Not Found", "detail"=>"Record not found.", "id"=>"http://worldcat.org/oclc/9000000000000", "found"=>false, "merged"=>false}, "updated"=>"2022-08-29T19:41:21.033Z"}], "extensions"=>[{"name"=>"os:totalResults", "attributes"=>{"xmlns:os"=>"http://a9.com/-/spec/opensearch/1.1/"}, "children"=>["1"]}, {"name"=>"os:startIndex", "attributes"=>{"xmlns:os"=>"http://a9.com/-/spec/opensearch/1.1/"}, "children"=>["1"]}, {"name"=>"os:itemsPerPage", "attributes"=>{"xmlns:os"=>"http://a9.com/-/spec/opensearch/1.1/"}, "children"=>["1"]}]}
 ```
 
 ### Validate batch of MARCXML records
@@ -266,7 +265,7 @@ RESULT(S)
 $ dcl-wc-metadata-api validate marc-batch-2018062514413340.xml
 
 OCLC WorldCat Metadata API: Validate operation
-Validated 164 records, 14 failed
+Validated 164 records and 14 failed
 Records written to wc-validate-20181002114734.xml
 Log written to wc-validate-20181002114734-log.txt
 ```

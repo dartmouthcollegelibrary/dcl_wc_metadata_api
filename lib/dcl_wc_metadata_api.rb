@@ -21,6 +21,7 @@ require 'uri'
 require 'net/http'
 require 'cgi'
 require 'yaml'
+require 'csv'
 
 # Minor extension to evaluate API's HTTP response
 
@@ -133,7 +134,11 @@ module DCL_WC_METADATA_API
         :debug => false
       )
       @debug_info = "CLIENT REQUEST(S)"
-      @response_status = "\nRESULT(S)\n\n"
+      if @global_opts[:csv]
+        @response_status = ["Record Number", "Status",  "Response"].to_csv
+      else
+        @response_status = "RESULT(S)\n\n"
+      end
       @response_data = Nokogiri::XML::Document.parse(
         "<collection xmlns=\"http://www.loc.gov/MARC21/slim\">"
       )
@@ -161,13 +166,14 @@ module DCL_WC_METADATA_API
         data.close
       end
 
-      status_filename = prefix + "wc-" + @cmd + "-" + t + "-log.txt"
+      status_extension = @global_opts[:csv] ? ".csv" : ".txt"
+      status_filename = prefix + "wc-" + @cmd + "-" + t + "-log" + status_extension
 
       # Summary
       summary = ""
       summary << <<~SUMMARY
       OCLC WorldCat Metadata API: #{@cmd.capitalize} operation
-      #{PAST_TENSE[@cmd].capitalize} #{@successes.to_s} #{@successes != 1 ? "records," : "record,"} #{@failures.to_s} failed
+      #{PAST_TENSE[@cmd].capitalize} #{@successes.to_s} #{@successes != 1 ? "records" : "record"} and #{@failures.to_s} failed
       #{"Records written to " + data_filename if any_records}
       Log written to #{status_filename}
       SUMMARY
@@ -175,7 +181,7 @@ module DCL_WC_METADATA_API
       # Status log
       status = File.new(status_filename, "w+:UTF-8")
       status.write(@debug_info) if @global_opts[:debug]
-      status.write(summary)
+      status.write(summary + "\n")
       status.write(@response_status)
       status.close
 
@@ -184,30 +190,40 @@ module DCL_WC_METADATA_API
 
     # Handle success or failure for each API call
     def manage_record_result(id, result)
+      separator = @global_opts[:csv] ? "," : ": "
       if @client.is_success?
         @response_data.root << result.at_xpath(RECORD_XPATH,
           "marc" => XMLNS_MARC
         )
-        @response_status << id + ": " + PAST_TENSE[@cmd] + "\n"
-        puts id + ": " + PAST_TENSE[@cmd] if @global_opts[:verbose]
+        @response_status << id + separator + PAST_TENSE[@cmd] + "\n"
+        puts id + separator + PAST_TENSE[@cmd] if @global_opts[:verbose]
         @successes += 1
       else
-        @response_status << id + ": failed\n"
-        @response_status << result.to_s
-        puts id + ": failed" if @global_opts[:verbose]
+        if @global_opts[:csv]
+          @response_status << [id, "failed", result.to_s].to_csv
+        else
+          @response_status << id + separator + "failed\n"
+          @response_status << result.to_s
+        end
+        puts id + separator + "failed" if @global_opts[:verbose]
         @failures += 1
       end
     end
 
     def manage_holding_result(id, result)
+      separator = @global_opts[:csv] ? "," : ": "
       if @client.is_success?
-        @response_status << id + ": holding updated\n"
-        puts id + ": holding updated" if @global_opts[:verbose]
+        @response_status << id + separator + "holding updated\n"
+        puts id + separator + "holding updated" if @global_opts[:verbose]
         @successes += 1 if ["set", "unset"].include?(@cmd)
       else
-        @response_status << id + ": update holding failed\n"
-        @response_status << result.to_s
-        puts id + ": update holding failed" if @global_opts[:verbose]
+        if @global_opts[:csv]
+          @response_status << [id, "update holding failed", result.to_s].to_csv
+        else
+          @response_status << id + separator + "update holding failed\n"
+          @response_status << result.to_s
+        end
+        puts id + separator + "update holding failed" if @global_opts[:verbose]
         @failures += 1 if ["set", "unset"].include?(@cmd)
       end
     end
@@ -217,24 +233,29 @@ module DCL_WC_METADATA_API
       merged = result["entries"][0]["content"]["merged"]
       returnedNumber = result["entries"][0]["content"]["currentOclcNumber"]
       detail = result["entries"][0]["content"]["detail"]
+      separator = @global_opts[:csv] ? "," : ": "
 
       if @client.is_success? and found and returnedNumber == id
-        @response_status << id + ": #{returnedNumber}\n"
-        puts id + ": #{returnedNumber}" if @global_opts[:verbose]
+        @response_status << id + separator + "#{returnedNumber}\n"
+        puts id + separator + "#{returnedNumber}" if @global_opts[:verbose]
         @successes += 1 if @cmd == "check"
       else
         if merged
-          @response_status << id + ": merged with #{returnedNumber}\n"
-          puts id + ": merged with #{returnedNumber}" if @global_opts[:verbose]
+          @response_status << id + separator + "merged with #{returnedNumber}\n"
+          puts id + separator + "merged with #{returnedNumber}" if @global_opts[:verbose]
         else
           if detail.nil?
-            @response_status << id + ": number check failed\n"
-            puts id + ": number check failed" if @global_opts[:verbose]
+            @response_status << id + separator + "number check failed\n"
+            puts id + separator + "number check failed" if @global_opts[:verbose]
           else
-            @response_status << id + ": number check failed (#{detail})\n"
-            puts id + ": number check failed (#{detail})" if @global_opts[:verbose]
+            if @global_opts[:csv]
+              @response_status << [id, "number check failed (\"#{detail}\")", result.to_s].to_csv
+            else
+              @response_status << id + separator + "number check failed (\"#{detail}\")\n"
+              @response_status << result.to_s + "\n"
+            end
+            puts id + separator + "number check failed (\"#{detail}\")" if @global_opts[:verbose]
           end
-          @response_status << result.to_s + "\n"
         end
         @failures += 1 if @cmd == "check"
       end
